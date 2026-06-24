@@ -12,6 +12,9 @@
     {% if activity.sport == 'running' and activity.distance_m %}
     <div class="stat"><span class="stat-label">Pace</span><span class="stat-value">{{ activity.total_time_s | pace(activity.distance_m) }}</span></div>
     {% endif %}
+    {% if activity.sport == 'cycling' and activity.distance_m %}
+    <div class="stat"><span class="stat-label">Vel. média</span><span class="stat-value">{{ activity.total_time_s | speed(activity.distance_m) }}</span></div>
+    {% endif %}
     <div class="stat"><span class="stat-label">FC média</span><span class="stat-value">{{ activity.avg_hr or "—" }}</span></div>
     <div class="stat"><span class="stat-label">FC mínima</span><span class="stat-value">{{ activity.min_hr or "—" }}</span></div>
     <div class="stat"><span class="stat-label">FC máxima</span><span class="stat-value">{{ activity.max_hr or "—" }}</span></div>
@@ -22,10 +25,30 @@
     {% endif %}
 </div>
 
+{% if activity.sport == 'cycling' and not activity.has_gps %}
+<form class="inline-edit" method="post" action="/activities/{{ activity.id }}/distance">
+    <label for="distance_km">Distância (bike indoor)</label>
+    <div class="inline-edit-row">
+        <input type="number" id="distance_km" name="distance_km" step="0.01" min="0"
+               value="{{ '%.2f'|format(activity.distance_m / 1000) if activity.distance_m else '' }}"
+               placeholder="ex: 22.5">
+        <span class="inline-unit">km</span>
+        <button type="submit"><i class="ph ph-check"></i> Salvar</button>
+    </div>
+    <p class="hint"><i class="ph ph-info"></i> O relógio não capta a distância aqui — informe manualmente; a velocidade média é calculada (distância ÷ tempo).</p>
+</form>
+{% endif %}
+
+{% if activity.sport == 'training' %}
+<section id="strength-section" hx-on::after-swap="window.initMuscleMap && window.initMuscleMap()">
+    {% include "_strength.html" %}
+</section>
+{% endif %}
+
 {% if activity.has_gps %}
 <h2><i class="ph ph-map-trifold"></i> Mapa</h2>
 <div id="map"></div>
-{% else %}
+{% elif activity.sport != 'training' %}
 <p class="hint"><i class="ph ph-house"></i> Esta atividade não tem dados de GPS (ex: atividade indoor).</p>
 {% endif %}
 
@@ -35,6 +58,35 @@
 {% endblock %}
 
 {% block extra_scripts %}
+{% if activity.sport == 'training' %}
+<script type="module">
+    // Mapa muscular (body-highlighter, MIT, via CDN ESM — sem build step).
+    // Pinta os músculos treinados a partir dos exercícios já registrados.
+    import createBodyHighlighter from "https://esm.sh/body-highlighter@3.0.2";
+
+    const STYLE = { width: "8.5rem" };
+    const HIGHLIGHT = ["#ff4d00"];
+
+    // Global (chamada também pelo hx-on::after-swap após add/remover série).
+    window.initMuscleMap = function () {
+        const wrap = document.getElementById("muscle-map");
+        if (!wrap) return;
+        let muscles = [];
+        try { muscles = JSON.parse(wrap.dataset.muscles || "[]"); } catch (_) {}
+        const data = muscles.length ? [{ name: "Treino", muscles }] : [];
+        const front = wrap.querySelector(".bm-front");
+        const back = wrap.querySelector(".bm-back");
+        front.innerHTML = ""; back.innerHTML = "";
+        try {
+            createBodyHighlighter({ container: front, data, type: "anterior", style: STYLE, highlightedColors: HIGHLIGHT });
+            createBodyHighlighter({ container: back, data, type: "posterior", style: STYLE, highlightedColors: HIGHLIGHT });
+        } catch (e) {
+            console.error("muscle map", e);
+        }
+    };
+    window.initMuscleMap();
+</script>
+{% endif %}
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script>
@@ -80,28 +132,67 @@
     }
 
     function renderHrChart(props) {
-        const hr = (props.hr || []).filter(v => v !== null && v !== undefined);
-        if (hr.length === 0) return;
+        const ts = props.t || [];
+        const hrAll = props.hr || [];
+
+        // pareia (horário, bpm), descartando amostras sem FC.
+        // '+Z' força interpretar o timestamp como UTC só para calcular diferenças
+        // de forma consistente; a exibição usa o mesmo relógio (sem conversão de fuso).
+        const pts = [];
+        for (let i = 0; i < hrAll.length; i++) {
+            const v = hrAll[i];
+            if (v === null || v === undefined) continue;
+            const ms = Date.parse((ts[i] || "") + "Z");
+            if (isNaN(ms)) continue;
+            pts.push({ ms, hr: v });
+        }
+        if (pts.length === 0) return;
+
+        const startMs = pts[0].ms;
+        const data = pts.map(p => ({ x: (p.ms - startMs) / 1000, y: p.hr })); // x = segundos desde o início
+        const clock = (sec) => new Date(startMs + sec * 1000).toISOString().substr(11, 5); // "HH:MM"
+
         new Chart(document.getElementById('hr-chart'), {
             type: 'line',
             data: {
-                labels: hr.map((_, i) => i),
                 datasets: [{
-                    label: 'FC (bpm)',
-                    data: hr,
-                    borderColor: '#d85a30',
-                    backgroundColor: 'rgba(216,90,48,0.1)',
+                    label: 'FC',
+                    data,
+                    borderColor: '#ff4d00',
+                    backgroundColor: 'rgba(255,77,0,0.08)',
                     pointRadius: 0,
                     borderWidth: 1.5,
                     tension: 0.2,
+                    fill: true,
                 }],
             },
             options: {
+                parsing: false,  // dados já vêm como {x, y}
+                interaction: { mode: 'index', intersect: false },
                 scales: {
-                    x: { display: false },
-                    y: { title: { display: true, text: 'bpm' } },
+                    x: {
+                        type: 'linear',
+                        grid: { display: false },
+                        ticks: {
+                            maxTicksLimit: 6, maxRotation: 0, autoSkip: true,
+                            color: '#8a8a8e', font: { size: 10 },
+                            callback: (value) => clock(value),  // mostra o horário real
+                        },
+                    },
+                    y: {
+                        title: { display: true, text: 'bpm' },
+                        grid: { color: 'rgba(0,0,0,0.05)' },
+                    },
                 },
-                plugins: { legend: { display: false } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => clock(items[0].parsed.x),  // horário do ponto
+                            label: (item) => `${item.parsed.y} bpm`,
+                        },
+                    },
+                },
             },
         });
     }

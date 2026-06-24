@@ -65,6 +65,8 @@ main:has(.dash) { max-width: none; padding: 0; }
     font-size: 1.2rem;
 }
 .brand .ph { color: var(--accent); font-size: 1.25rem; }
+.nav-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-family: var(--font-mono); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; transition: color 0.15s; }
+.nav-link:hover { color: var(--accent); }
 .nav-user { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); margin-left: auto; font-family: var(--font-mono); font-size: 0.78rem; }
 .nav-logout { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-family: var(--font-mono); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; transition: color 0.15s; }
 .nav-logout:hover { color: var(--accent); }
@@ -155,3 +157,93 @@ button:active { transform: scale(0.98); }
 .hint { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 0.85rem; margin-top: 14px; }
 .hint .ph { color: var(--accent); }
 .empty { color: var(--text-muted); font-size: 0.92rem; margin-top: 14px; }
+
+/* ---------- página de integração (Health Auto Export) ---------- */
+.integ { margin-top: 8px; }
+.integ h2 { margin-top: 28px; }
+.copybox { margin-top: 10px; }
+.copybox input {
+    width: 100%; padding: 11px 13px;
+    border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+    font-family: var(--font-mono); font-size: 0.85rem; color: var(--text);
+    background: var(--surface-2, #f2f2f0);
+}
+.copybox input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.steps { margin: 12px 0 0; padding-left: 20px; color: var(--text-soft); font-size: 0.92rem; line-height: 1.6; }
+.steps code, .integ code { font-family: var(--font-mono); font-size: 0.85em; background: var(--accent-soft); color: var(--accent); padding: 1px 6px; border-radius: 5px; }
+.btn-regen { margin-top: 14px; background: transparent; color: var(--text-muted); border: 1px solid var(--border-2); }
+.btn-regen:hover { color: var(--accent); border-color: var(--accent); background: transparent; }
+
+/* ---------- edição inline (ex: distância de bike indoor) ---------- */
+.inline-edit {
+    margin-top: 16px;
+    background: var(--surface);
+    border: 1px dashed var(--border-2);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+}
+.inline-edit > label { font-family: var(--font-mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-muted); }
+.inline-edit-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.inline-edit input {
+    width: 120px; padding: 9px 11px; border: 1px solid var(--border-2);
+    border-radius: var(--radius-sm); font-family: var(--font-body); font-size: 0.95rem; background: var(--surface);
+}
+.inline-edit input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.inline-unit { font-family: var(--font-mono); color: var(--text-muted); font-size: 0.9rem; margin-right: 4px; }
+.inline-edit button { padding: 9px 16px; }
+.inline-edit .hint { margin-top: 10px; }
+
+/* ---------- musculação: séries + mapa muscular ---------- */
+.strength-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) 1fr;
+    gap: 24px;
+    margin-top: 16px;
+    align-items: start;
+}
+@media (max-width: 680px) { .strength-layout { grid-template-columns: 1fr; } }
+
+.muscle-map {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 76px;
+}
+.muscle-map .bm { flex: 1; display: flex; justify-content: center; }
+.muscle-map svg { width: 100%; height: auto; }
+
+.strength-log { display: flex; flex-direction: column; gap: 12px; }
+
+.ex-block { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow); }
+.ex-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ex-name { font-family: var(--font-display); text-transform: uppercase; font-size: 1.05rem; letter-spacing: 0.01em; }
+.ex-count { font-family: var(--font-mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); }
+
+.set-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.set-row { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; }
+.set-idx {
+    width: 22px; height: 22px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--accent-soft); color: var(--accent);
+    border-radius: 6px; font-family: var(--font-mono); font-size: 0.72rem;
+}
+.set-reps { font-weight: 600; }
+.set-weight { color: var(--text-muted); }
+.set-del { margin-left: auto; background: transparent; color: var(--text-muted); border: 1px solid var(--border); width: 28px; height: 28px; padding: 0; border-radius: 7px; font-size: 0.9rem; }
+.set-del:hover { color: var(--down); border-color: var(--down); background: transparent; }
+
+.set-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--surface); border: 1px dashed var(--border-2); border-radius: var(--radius); padding: 12px 14px; }
+.set-form select, .set-form input {
+    padding: 9px 11px; border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+    font-family: var(--font-body); font-size: 0.9rem; background: var(--surface);
+}
+.set-form select { flex: 1 1 160px; }
+.set-form input { width: 92px; }
+.set-form select:focus, .set-form input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.set-form button { padding: 9px 16px; }

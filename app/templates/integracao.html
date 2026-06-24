@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Integração — Stamina{% endblock %}
+
+{% block content %}
+<a href="/" class="back-link"><i class="ph ph-arrow-left"></i> voltar</a>
+<h1 class="detail-title"><i class="ph ph-plugs-connected"></i> Sincronização automática</h1>
+<p class="activity-date"><i class="ph ph-device-mobile"></i> Health Auto Export → Stamina</p>
+
+<section class="integ">
+    <h2><i class="ph ph-link"></i> Sua URL de ingestão</h2>
+    <p class="hint">Cole esta URL no app <strong>Health Auto Export</strong> (iPhone), numa automação
+        de <em>REST API</em> exportando <em>Workouts</em> em JSON. Os treinos passam a chegar sozinhos.</p>
+    <div class="copybox">
+        <input type="text" readonly value="{{ ingest_url }}" onclick="this.select()">
+    </div>
+    <p class="hint"><i class="ph ph-shield-check"></i> O token identifica a sua conta. Trate como senha —
+        quem tiver essa URL consegue enviar treinos para você.</p>
+
+    <h2><i class="ph ph-list-checks"></i> Como configurar (resumo)</h2>
+    <ol class="steps">
+        <li>No app <strong>Zepp</strong>: Profile → Add accounts → <strong>Apple Health</strong> (sincroniza os treinos do relógio para o Apple Health).</li>
+        <li>No <strong>Health Auto Export</strong> (licença Basic): crie uma <strong>Automation</strong> → tipo <strong>REST API</strong>.</li>
+        <li>Método <strong>POST</strong>, formato <strong>JSON</strong>, dados <strong>Workouts</strong> (com Route + Heart Rate), e cole a URL acima.</li>
+        <li>Opcional: em vez do <code>?token=</code> na URL, use o endpoint <code>{{ ingest_endpoint }}</code> com o header <code>Authorization: Bearer SEU_TOKEN</code>.</li>
+    </ol>
+
+    <h2><i class="ph ph-key"></i> Token</h2>
+    <div class="copybox">
+        <input type="text" readonly value="{{ token }}" onclick="this.select()">
+    </div>
+    <form method="post" action="/integracao/regenerate"
+          onsubmit="return confirm('Regenerar o token invalida a URL atual — você precisará atualizar no Health Auto Export. Continuar?');">
+        <button type="submit" class="btn-regen"><i class="ph ph-arrows-clockwise"></i> Regenerar token</button>
+    </form>
+</section>
+{% endblock %}

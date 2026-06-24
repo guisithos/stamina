@@ -1,0 +1,55 @@
+{# Conteúdo da seção de musculação. Renderizado tanto no detalhe quanto nas
+   respostas HTMX de add/remove série (que trocam o innerHTML de #strength-section). #}
+<h2><i class="ph ph-barbell"></i> Treino de força</h2>
+
+<div class="strength-layout">
+    {# mapa muscular: data-muscles é lido pelo JS (initMuscleMap) no detalhe #}
+    <div class="muscle-map" id="muscle-map" data-muscles='{{ muscles_json | safe }}'>
+        <div class="bm bm-front"></div>
+        <div class="bm bm-back"></div>
+    </div>
+
+    <div class="strength-log">
+        {% if grouped_sets %}
+            {% for ex, sets in grouped_sets.items() %}
+            <div class="ex-block">
+                <div class="ex-head">
+                    <span class="ex-name">{{ exercise_label(ex) }}</span>
+                    <span class="ex-count">{{ sets | length }} série{{ 's' if sets | length != 1 else '' }}</span>
+                </div>
+                <ul class="set-list">
+                    {% for s in sets %}
+                    <li class="set-row">
+                        <span class="set-idx">{{ loop.index }}</span>
+                        <span class="set-reps">{{ s.reps or '—' }} reps</span>
+                        <span class="set-weight">{{ ('%g kg' % s.weight_kg) if s.weight_kg else 'peso corporal' }}</span>
+                        <button class="set-del"
+                                hx-delete="/activities/{{ activity.id }}/sets/{{ s.id }}"
+                                hx-target="#strength-section" hx-swap="innerHTML"
+                                hx-confirm="Remover esta série?" title="Remover série">
+                            <i class="ph ph-x"></i>
+                        </button>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="empty">Nenhuma série registrada ainda. Adicione abaixo 👇</p>
+        {% endif %}
+
+        <form class="set-form" hx-post="/activities/{{ activity.id }}/sets"
+              hx-target="#strength-section" hx-swap="innerHTML">
+            <select name="exercise" required>
+                {% for group, keys in exercise_groups.items() %}
+                <optgroup label="{{ group }}">
+                    {% for k in keys %}<option value="{{ k }}">{{ exercise_label(k) }}</option>{% endfor %}
+                </optgroup>
+                {% endfor %}
+            </select>
+            <input type="number" name="reps" min="1" placeholder="reps" required>
+            <input type="number" name="weight" min="0" step="0.5" placeholder="kg">
+            <button type="submit"><i class="ph ph-plus"></i> Série</button>
+        </form>
+    </div>
+</div>

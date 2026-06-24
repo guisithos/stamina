@@ -82,6 +82,24 @@ Depois disso, `fly deploy` a cada mudança já atualiza o app no ar. Como o
 volume prende o app a uma única máquina, mantenha `min_machines_running = 0`
 (escala a zero quando ocioso) — é o padrão do `fly.toml`.
 
+> No primeiro boot após o deploy, o app roda uma micro-migração que adiciona as
+> colunas novas (`source`, `external_id`, `ingest_token`) ao `app.db` existente.
+> É idempotente — não precisa fazer nada manualmente.
+
+## Sincronização automática (Health Auto Export)
+
+Em vez de exportar `.fit` manualmente, dá pra receber os treinos automaticamente:
+
+1. **Zepp** (iPhone): Profile → Add accounts → **Apple Health** (envia os treinos do
+   relógio pro Apple Health).
+2. **Health Auto Export** (licença Basic, compra única): crie uma automação **REST API**,
+   método `POST`, formato `JSON`, dados **Workouts** (com Route + Heart Rate).
+3. No Stamina, abra **Integração** (no menu) e copie a sua URL de ingestão
+   (`/ingest/hae?token=...`) pra dentro do Health Auto Export.
+
+Os treinos passam a chegar sozinhos em `POST /ingest/hae` — autenticado pelo seu token,
+idempotente (não duplica em reenvios). Detalhes em `doc-interna.md` §6.9.
+
 ## Decisões da v0 (e o que evolui depois)
 
 - **Formato de entrada: FIT.** É o que Garmin usa nativamente e o que o Zepp também

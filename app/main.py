@@ -1,6 +1,8 @@
 import json
 import os
+import secrets
 from datetime import datetime
+from typing import Optional
 
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -10,18 +12,21 @@ from sqlmodel import Session, select
 from starlette.middleware.sessions import SessionMiddleware
 
 from .auth import get_current_user, get_user_by_email, hash_password, verify_password
-from .database import create_db_and_tables, get_session
+from .database import create_db_and_tables, get_session, run_light_migrations
 from .fit_parser import parse_fit
 from .geo import track_to_geojson
+from .hae_parser import parse_hae_workout
 from .metrics import (
     activity_metrics,
     format_date,
     format_distance,
     format_duration,
     format_pace,
+    format_speed,
     sport_icon,
 )
-from .models import Activity, User
+from .models import Activity, StrengthSet, User
+from .strength import EXERCISE_GROUPS, EXERCISES, exercise_label, muscles_for
 from .summary import month_name, monthly_summary, week_days
 
 app = FastAPI(title="Stamina")
@@ -44,6 +49,7 @@ if not SECRET_KEY:
 # Tamanho/quantidade máximos de upload — evita exaurir a memória da máquina (256MB).
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB por arquivo (um .fit real tem < 1 MB)
 MAX_FILES_PER_UPLOAD = 25
+MAX_INGEST_BYTES = 25 * 1024 * 1024  # 25 MB por payload do Health Auto Export
 
 # Permite fechar o cadastro depois de criar sua conta (ALLOW_REGISTRATION=false).
 ALLOW_REGISTRATION = os.getenv("ALLOW_REGISTRATION", "true").lower() != "false"
@@ -74,14 +80,17 @@ templates.env.filters["duration"] = format_duration
 templates.env.filters["distance"] = format_distance
 templates.env.filters["datebr"] = format_date
 templates.env.filters["pace"] = format_pace
+templates.env.filters["speed"] = format_speed
 # funções usadas direto no template (decisão por esporte mora em metrics.py)
 templates.env.globals["card_metrics"] = activity_metrics
 templates.env.globals["sport_icon"] = sport_icon
+templates.env.globals["exercise_label"] = exercise_label
 
 
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
+    run_light_migrations()
 
 
 # ---------- auth ----------
@@ -114,7 +123,11 @@ def register(
     if get_user_by_email(session, email):
         return _error("Esse e-mail já está cadastrado.")
 
-    user = User(email=email, hashed_password=hash_password(password))
+    user = User(
+        email=email,
+        hashed_password=hash_password(password),
+        ingest_token=secrets.token_urlsafe(32),  # já nasce pronto pra ingestão automática
+    )
     session.add(user)
     session.commit()
     session.refresh(user)
@@ -194,29 +207,86 @@ def upload_activities(
             if len(raw) > MAX_UPLOAD_BYTES:
                 raise ValueError("arquivo grande demais (máx 10 MB)")
             parsed = parse_fit(raw)
-            activity = Activity(
-                user_id=user.id,
-                sport=parsed["sport"] or "unknown",
-                sub_sport=parsed["sub_sport"],
-                label=parsed["label"],
-                start_time=parsed["start_time"] or datetime.utcnow(),
-                total_time_s=parsed["total_time_s"] or 0,
-                avg_hr=parsed["avg_hr"],
-                min_hr=parsed["min_hr"],
-                max_hr=parsed["max_hr"],
-                calories=parsed["calories"],
-                distance_m=parsed["distance_m"],
-                total_ascent_m=parsed["total_ascent_m"],
-                total_descent_m=parsed["total_descent_m"],
-                has_gps=parsed["has_gps"],
-                track_points_json=json.dumps(parsed["track_points"]),
-                raw_filename=upload.filename,
-            )
-            session.add(activity)
+            session.add(_activity_from_parsed(user.id, parsed, source="fit", raw_filename=upload.filename))
         except Exception as exc:  # arquivo inválido/corrompido — não derruba o upload dos outros
             errors.append(f"{upload.filename}: {exc}")
     session.commit()
     return RedirectResponse(url="/", status_code=303)
+
+
+def _activity_from_parsed(user_id, parsed, *, source, external_id=None, raw_filename=None) -> Activity:
+    """Constrói uma Activity a partir do dict que parse_fit / parse_hae_workout devolvem.
+    Um único ponto de criação para as duas origens (FIT manual e Health Auto Export)."""
+    return Activity(
+        user_id=user_id,
+        source=source,
+        external_id=external_id,
+        sport=parsed["sport"] or "unknown",
+        sub_sport=parsed["sub_sport"],
+        label=parsed["label"],
+        start_time=parsed["start_time"] or datetime.utcnow(),
+        total_time_s=parsed["total_time_s"] or 0,
+        avg_hr=parsed["avg_hr"],
+        min_hr=parsed["min_hr"],
+        max_hr=parsed["max_hr"],
+        calories=parsed["calories"],
+        distance_m=parsed["distance_m"],
+        total_ascent_m=parsed["total_ascent_m"],
+        total_descent_m=parsed["total_descent_m"],
+        has_gps=parsed["has_gps"],
+        track_points_json=json.dumps(parsed["track_points"]),
+        raw_filename=raw_filename,
+    )
+
+
+def _extract_ingest_token(request: Request) -> Optional[str]:
+    """Token via Authorization: Bearer, header X-Ingest-Token ou ?token= (nessa ordem)."""
+    auth = request.headers.get("authorization", "")
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return request.headers.get("x-ingest-token") or request.query_params.get("token")
+
+
+@app.post("/ingest/hae")
+async def ingest_hae(request: Request, session: Session = Depends(get_session)):
+    """Recebe o payload JSON do Health Auto Export e cria atividades (idempotente).
+    Auth por token de usuário — sem cookie de sessão (chamada máquina-a-máquina)."""
+    token = _extract_ingest_token(request)
+    user = session.exec(select(User).where(User.ingest_token == token)).first() if token else None
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "token de ingestão inválido"})
+
+    raw = await request.body()
+    if len(raw) > MAX_INGEST_BYTES:
+        return JSONResponse(status_code=413, content={"detail": "payload grande demais"})
+    try:
+        payload = json.loads(raw)
+    except (ValueError, TypeError):
+        return JSONResponse(status_code=400, content={"detail": "JSON inválido"})
+
+    workouts = ((payload.get("data") or {}).get("workouts")) or []
+    created = duplicates = errors = 0
+    for w in workouts:
+        try:
+            ext = str(w.get("id")) if w.get("id") is not None else None
+            if ext and session.exec(
+                select(Activity).where(
+                    Activity.user_id == user.id,
+                    Activity.source == "hae",
+                    Activity.external_id == ext,
+                )
+            ).first():
+                duplicates += 1  # idempotência: já ingerido, não duplica
+                continue
+            parsed = parse_hae_workout(w)
+            session.add(_activity_from_parsed(user.id, parsed, source="hae", external_id=ext))
+            created += 1
+        except Exception as exc:  # um workout ruim não derruba os outros
+            errors += 1
+            print(f"[ingest/hae] erro no workout id={w.get('id')}: {exc}")
+    session.commit()
+    print(f"[ingest/hae] user={user.id} criados={created} duplicados={duplicates} erros={errors}")
+    return {"created": created, "duplicates": duplicates, "errors": errors}
 
 
 @app.delete("/activities/{activity_id}")
@@ -228,6 +298,9 @@ def delete_activity(
         return HTMLResponse(status_code=401)
     activity = session.get(Activity, activity_id)
     if activity and activity.user_id == user.id:
+        # SQLite não faz cascade automático — remove as séries de musculação antes.
+        for s in session.exec(select(StrengthSet).where(StrengthSet.activity_id == activity.id)).all():
+            session.delete(s)
         session.delete(activity)
         session.commit()
     return HTMLResponse("")  # HTMX remove a linha da tela, não precisa de conteúdo
@@ -248,10 +321,155 @@ def activity_detail(
     # Os pontos do percurso NÃO vão embutidos no HTML — a página os busca via
     # GET /activities/{id}/track.geojson. Mantém o HTML leve e a geometria
     # cacheável/reutilizável.
+    context = {"request": request, "user": user, "activity": activity}
+    if activity.sport == "training":  # musculação ganha o registro de séries + mapa muscular
+        context.update(_strength_context(activity, session))
+    return templates.TemplateResponse("activity_detail.html", context)
+
+
+def _strength_context(activity: Activity, session: Session) -> dict:
+    """Monta o contexto da seção de musculação: séries agrupadas por exercício +
+    músculos agregados (JSON pro mapa) + catálogo pro <select>."""
+    sets = session.exec(
+        select(StrengthSet).where(StrengthSet.activity_id == activity.id).order_by(StrengthSet.id)
+    ).all()
+    grouped: dict[str, list] = {}
+    for s in sets:
+        grouped.setdefault(s.exercise, []).append(s)
+    muscles = sorted(muscles_for(grouped.keys()))
+    return {
+        "grouped_sets": grouped,
+        "muscles_json": json.dumps(muscles),
+        "exercise_groups": EXERCISE_GROUPS,
+    }
+
+
+def _strength_partial(activity: Activity, session: Session, request: Request):
+    """Renderiza só a seção de musculação (usada nas respostas HTMX de add/remove série)."""
+    ctx = {"request": request, "activity": activity}
+    ctx.update(_strength_context(activity, session))
+    return templates.TemplateResponse("_strength.html", ctx)
+
+
+@app.post("/activities/{activity_id}/sets", response_class=HTMLResponse)
+def add_strength_set(
+    request: Request,
+    activity_id: int,
+    exercise: str = Form(...),
+    reps: str = Form(""),
+    weight: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    user = get_current_user(request, session)
+    if not user:
+        return HTMLResponse(status_code=401)
+    activity = session.get(Activity, activity_id)
+    if not activity or activity.user_id != user.id or activity.sport != "training":
+        return HTMLResponse(status_code=404)
+    if exercise not in EXERCISES:
+        return HTMLResponse(status_code=400)
+
+    def _to_int(v):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+
+    def _to_float(v):
+        try:
+            return float(str(v).replace(",", "."))
+        except (TypeError, ValueError):
+            return None
+
+    session.add(StrengthSet(
+        activity_id=activity.id,
+        exercise=exercise,
+        reps=_to_int(reps),
+        weight_kg=_to_float(weight),
+    ))
+    session.commit()
+    return _strength_partial(activity, session, request)
+
+
+@app.delete("/activities/{activity_id}/sets/{set_id}", response_class=HTMLResponse)
+def delete_strength_set(
+    request: Request, activity_id: int, set_id: int, session: Session = Depends(get_session)
+):
+    user = get_current_user(request, session)
+    if not user:
+        return HTMLResponse(status_code=401)
+    activity = session.get(Activity, activity_id)
+    if not activity or activity.user_id != user.id:
+        return HTMLResponse(status_code=404)
+    s = session.get(StrengthSet, set_id)
+    if s and s.activity_id == activity.id:
+        session.delete(s)
+        session.commit()
+    return _strength_partial(activity, session, request)
+
+
+@app.get("/integracao", response_class=HTMLResponse)
+def integration_page(request: Request, session: Session = Depends(get_session)):
+    user = get_current_user(request, session)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    if not user.ingest_token:  # usuário antigo sem token ainda
+        user.ingest_token = secrets.token_urlsafe(32)
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+    base = str(request.base_url).rstrip("/")
+    if "127.0.0.1" not in base and "localhost" not in base:
+        base = base.replace("http://", "https://")  # Fly serve HTTPS atrás do proxy
     return templates.TemplateResponse(
-        "activity_detail.html",
-        {"request": request, "user": user, "activity": activity},
+        "integracao.html",
+        {
+            "request": request,
+            "user": user,
+            "ingest_url": f"{base}/ingest/hae?token={user.ingest_token}",
+            "ingest_endpoint": f"{base}/ingest/hae",
+            "token": user.ingest_token,
+        },
     )
+
+
+@app.post("/integracao/regenerate")
+def integration_regenerate(request: Request, session: Session = Depends(get_session)):
+    user = get_current_user(request, session)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    user.ingest_token = secrets.token_urlsafe(32)
+    session.add(user)
+    session.commit()
+    return RedirectResponse(url="/integracao", status_code=303)
+
+
+@app.post("/activities/{activity_id}/distance")
+def edit_distance(
+    request: Request,
+    activity_id: int,
+    distance_km: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    """Distância manual para bike indoor (relógio não capta, sem ciclo-computador).
+    A velocidade média é derivada de distância/tempo na exibição — não é gravada."""
+    user = get_current_user(request, session)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    activity = session.get(Activity, activity_id)
+    # só faz sentido pra bike indoor (cycling sem GPS)
+    if not activity or activity.user_id != user.id or activity.sport != "cycling" or activity.has_gps:
+        return RedirectResponse(url="/", status_code=303)
+
+    try:
+        km = float(distance_km.replace(",", "."))
+        activity.distance_m = km * 1000 if km > 0 else None
+    except (TypeError, ValueError):
+        activity.distance_m = None
+    session.add(activity)
+    session.commit()
+    return RedirectResponse(url=f"/activities/{activity_id}", status_code=303)
 
 
 @app.get("/activities/{activity_id}/track.geojson")
