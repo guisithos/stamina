@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Stamina{% endblock %}
+
+{% block head_extra %}
+{# fontes (Anton/Inter/JetBrains Mono) e Phosphor já vêm do base.html #}
+<link rel="stylesheet" href="/static/dashboard.css">
+{% endblock %}
+
+{% block content %}
+<div class="dash">
+
+  {# ---------- TOPO: UPLOAD ---------- #}
+  <section class="reveal" style="--delay:.05s">
+    <div class="upload-card">
+      <div class="upload-copy">
+        <h2 class="display-md">Importar Performance</h2>
+        <p class="muted">
+          Selecione seus arquivos <code class="kbd">.fit</code> exportados do Zepp/Amazfit.
+        </p>
+      </div>
+      <form method="post" action="/activities/upload" enctype="multipart/form-data" class="upload-form">
+        <label class="btn btn-primary upload-btn">
+          <i class="ph ph-upload-simple"></i>
+          <span>Selecionar arquivos</span>
+          <input type="file" name="files" accept=".fit" multiple required>
+        </label>
+        <button type="submit" class="btn btn-ghost">
+          <span>Enviar</span> <i class="ph ph-arrow-right"></i>
+        </button>
+      </form>
+    </div>
+  </section>
+
+  {# ---------- RESUMO DO MÊS ---------- #}
+  <section class="reveal" style="--delay:.15s">
+    <header class="section-head">
+      <h2 class="display-xl">{{ month_name }}</h2>
+      <span class="mono-eyebrow">Resumo Mensal</span>
+    </header>
+
+    {% if month_summary %}
+    <div class="metric-grid">
+      {% for c in month_summary %}
+      <article class="metric-card {% if loop.index == 3 %}metric-card--accent{% endif %}">
+        <div class="metric-top">
+          <span class="metric-icon"><i class="ph ph-{{ c.icon }}"></i></span>
+          {% if c.pct is none %}
+            <span class="chip chip-new"><i class="ph ph-sparkle"></i> novo</span>
+          {% elif c.pct >= 0 %}
+            <span class="chip chip-up"><i class="ph ph-trend-up"></i> {{ c.pct | round | int }}%</span>
+          {% else %}
+            <span class="chip chip-down"><i class="ph ph-trend-down"></i> {{ (c.pct | abs) | round | int }}%</span>
+          {% endif %}
+        </div>
+        <div class="metric-value">
+          {{ c.distance if c.show_distance else c.time }}
+        </div>
+        <div class="metric-label">{{ c.label }}</div>
+        {% if c.show_distance %}
+          <div class="metric-sub mono">{{ c.time }}</div>
+        {% endif %}
+        <div class="metric-note">
+          vs. mês anterior ({{ 'distância' if c.compare == 'distance' else 'tempo' }})
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">Sem corrida, musculação, bike ou natação registradas neste mês.</p>
+    {% endif %}
+  </section>
+
+  {# ---------- TIRA SEMANAL ---------- #}
+  <section class="reveal" style="--delay:.25s">
+    <header class="section-head section-head--sm">
+      <h3 class="display-md">Esta Semana</h3>
+      <span class="mono-eyebrow">7 dias</span>
+    </header>
+    <div class="week-grid">
+      {% for d in week %}
+      <div class="week-cell
+                  {% if d.is_today %}is-today{% endif %}
+                  {% if d.is_future %}is-future{% endif %}
+                  {% if not d.icons and not d.is_today %}is-rest{% endif %}">
+        <span class="wd-label mono">{{ d.label }}</span>
+        <span class="wd-num display-sm">{{ '%02d' % d.day }}</span>
+        <div class="wd-body">
+          {% if d.icons %}
+            <div class="wd-icons">
+              {% for ic in d.icons %}<i class="ph ph-{{ ic }}"></i>{% endfor %}
+            </div>
+            {% if d.total_time %}<div class="wd-time mono">{{ d.total_time }}</div>{% endif %}
+          {% elif d.is_future %}
+            <span class="wd-dot"></span>
+          {% else %}
+            <span class="wd-rest mono">rest</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {# ---------- HISTÓRICO ---------- #}
+  <section class="reveal" style="--delay:.35s">
+    <header class="section-head section-head--sm">
+      <h3 class="display-md">Histórico</h3>
+      <span class="mono-eyebrow">todas as atividades</span>
+    </header>
+
+    {% if not activities %}
+      <p class="empty">Nenhuma atividade ainda. Envie um .fit acima pra começar.</p>
+    {% else %}
+    <div class="activity-list">
+      {% for a in activities %}
+      <article class="act-card" id="activity-row-{{ a.id }}">
+        <a href="/activities/{{ a.id }}" class="act-icon" aria-label="Abrir atividade">
+          <i class="ph ph-{{ sport_icon(a.sport) }}"></i>
+        </a>
+
+        <div class="act-head">
+          <div class="act-title-row">
+            <a class="act-title" href="/activities/{{ a.id }}">{{ a.label }}</a>
+            {% if a.has_gps %}
+              <span class="badge badge-gps" title="Tem GPS"><i class="ph ph-map-pin"></i> GPS</span>
+            {% endif %}
+          </div>
+          <p class="act-date mono">{{ a.start_time | datebr }}</p>
+        </div>
+
+        <div class="act-metrics">
+          {% for m in card_metrics(a) %}
+          <div class="act-metric">
+            <span class="am-label mono">{{ m.label }}</span>
+            <span class="am-value">{{ m.value }}</span>
+          </div>
+          {% endfor %}
+        </div>
+
+        <button
+          class="act-delete"
+          hx-delete="/activities/{{ a.id }}"
+          hx-target="#activity-row-{{ a.id }}"
+          hx-swap="outerHTML"
+          hx-confirm="Excluir esta atividade?"
+          title="Excluir atividade">
+          <i class="ph ph-trash"></i>
+        </button>
+      </article>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+</div>
+{% endblock %}

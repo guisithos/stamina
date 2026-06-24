@@ -1,0 +1,29 @@
+# Gerado pra usar com `fly launch` / `fly deploy`.
+# O nome do app é único GLOBALMENTE no Fly — se "stamina" já existir, o flyctl
+# vai pedir outro (ex: "stamina-gui"). Atualize aqui o que você escolher.
+app = "stamina"
+primary_region = "gru"  # São Paulo — região mais próxima do Brasil
+
+[build]
+
+[env]
+  PORT = "8080"
+  # SQLite mora no volume persistente montado em /data (ver [mounts] abaixo).
+  # Sem isso, o banco seria perdido a cada deploy/restart do container.
+  DATABASE_URL = "sqlite:////data/app.db"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[mounts]
+  source = "stamina_data"
+  destination = "/data"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

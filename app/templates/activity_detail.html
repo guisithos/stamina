@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}{{ activity.label }} — {{ activity.start_time | datebr }}{% endblock %}
+
+{% block content %}
+<a href="/" class="back-link"><i class="ph ph-arrow-left"></i> voltar</a>
+<h1 class="detail-title"><i class="ph ph-{{ sport_icon(activity.sport) }}"></i> {{ activity.label }}</h1>
+<p class="activity-date"><i class="ph ph-calendar-blank"></i> {{ activity.start_time | datebr }}</p>
+
+<div class="stats-grid">
+    <div class="stat"><span class="stat-label">Duração</span><span class="stat-value">{{ activity.total_time_s | duration }}</span></div>
+    <div class="stat"><span class="stat-label">Distância</span><span class="stat-value">{{ activity.distance_m | distance }}</span></div>
+    {% if activity.sport == 'running' and activity.distance_m %}
+    <div class="stat"><span class="stat-label">Pace</span><span class="stat-value">{{ activity.total_time_s | pace(activity.distance_m) }}</span></div>
+    {% endif %}
+    <div class="stat"><span class="stat-label">FC média</span><span class="stat-value">{{ activity.avg_hr or "—" }}</span></div>
+    <div class="stat"><span class="stat-label">FC mínima</span><span class="stat-value">{{ activity.min_hr or "—" }}</span></div>
+    <div class="stat"><span class="stat-label">FC máxima</span><span class="stat-value">{{ activity.max_hr or "—" }}</span></div>
+    <div class="stat"><span class="stat-label">Calorias</span><span class="stat-value">{{ activity.calories or "—" }}</span></div>
+    {% if activity.total_ascent_m %}
+    <div class="stat"><span class="stat-label">Ganho de elevação</span><span class="stat-value">{{ activity.total_ascent_m }} m</span></div>
+    <div class="stat"><span class="stat-label">Perda de elevação</span><span class="stat-value">{{ activity.total_descent_m }} m</span></div>
+    {% endif %}
+</div>
+
+{% if activity.has_gps %}
+<h2><i class="ph ph-map-trifold"></i> Mapa</h2>
+<div id="map"></div>
+{% else %}
+<p class="hint"><i class="ph ph-house"></i> Esta atividade não tem dados de GPS (ex: atividade indoor).</p>
+{% endif %}
+
+<h2><i class="ph ph-heartbeat"></i> Frequência cardíaca</h2>
+<canvas id="hr-chart" height="100"></canvas>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+    // Busca geometria + séries num endpoint separado (GeoJSON) em vez de
+    // embutir milhares de pontos no HTML: página leve, rota reutilizável.
+    fetch("/activities/{{ activity.id }}/track.geojson")
+        .then(r => r.json())
+        .then(geojson => {
+            const feature = geojson.features[0];
+            const props = feature.properties || {};
+
+            {% if activity.has_gps %}
+            if (feature.geometry) {
+                renderMap(feature);
+            }
+            {% endif %}
+
+            renderHrChart(props);
+        });
+
+    function renderMap(feature) {
+        const map = L.map('map');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19,
+        }).addTo(map);
+
+        const route = L.geoJSON(feature, {
+            style: { color: '#d85a30', weight: 4 },
+        }).addTo(map);
+        map.fitBounds(route.getBounds(), { padding: [20, 20] });
+
+        // Marcadores de início (verde) e fim (vermelho), como no Strava.
+        const coords = feature.geometry.coordinates; // [lon, lat]
+        addMarker(map, coords[0], '#2e7d32', 'Início');
+        addMarker(map, coords[coords.length - 1], '#c62828', 'Fim');
+    }
+
+    function addMarker(map, lonLat, color, label) {
+        L.circleMarker([lonLat[1], lonLat[0]], {
+            radius: 7, color: '#fff', weight: 2, fillColor: color, fillOpacity: 1,
+        }).addTo(map).bindPopup(label);
+    }
+
+    function renderHrChart(props) {
+        const hr = (props.hr || []).filter(v => v !== null && v !== undefined);
+        if (hr.length === 0) return;
+        new Chart(document.getElementById('hr-chart'), {
+            type: 'line',
+            data: {
+                labels: hr.map((_, i) => i),
+                datasets: [{
+                    label: 'FC (bpm)',
+                    data: hr,
+                    borderColor: '#d85a30',
+                    backgroundColor: 'rgba(216,90,48,0.1)',
+                    pointRadius: 0,
+                    borderWidth: 1.5,
+                    tension: 0.2,
+                }],
+            },
+            options: {
+                scales: {
+                    x: { display: false },
+                    y: { title: { display: true, text: 'bpm' } },
+                },
+                plugins: { legend: { display: false } },
+            },
+        });
+    }
+</script>
+{% endblock %}

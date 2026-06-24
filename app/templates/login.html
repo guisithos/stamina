@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Entrar{% endblock %}
+{% block content %}
+<div class="auth-box">
+    <div class="auth-brand"><i class="ph ph-pulse"></i> Stamina</div>
+    <h1>Entrar</h1>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <form method="post" action="/login">
+        <label>E-mail<input type="email" name="email" required></label>
+        <label>Senha<input type="password" name="password" required></label>
+        <button type="submit">Entrar</button>
+    </form>
+    <p class="auth-switch">Não tem conta? <a href="/register">Cadastre-se</a></p>
+</div>
+{% endblock %}

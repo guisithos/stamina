@@ -1,0 +1,157 @@
+/* ===========================================================
+   Chrome global (nav, auth, detalhe) — alinhado ao conceito
+   "Editorial Performance" do dashboard (static/dashboard.css).
+   Tokens compartilhados ficam aqui; o dashboard.css estende.
+   =========================================================== */
+:root {
+    --bg: #fdfcfb;
+    --surface: #ffffff;
+    --text: #121212;
+    --text-soft: #1212129a;
+    --text-muted: #12121266;
+    --border: #12121215;
+    --border-2: #1212122a;
+    --accent: #ff4d00;
+    --accent-soft: #ff4d0014;
+    --up: #0a8a4a;
+    --down: #d22d2d;
+
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 18px;
+    --shadow: 0 1px 0 rgba(0,0,0,.02), 0 8px 24px -16px rgba(0,0,0,.08);
+
+    --font-display: "Anton", "Inter", sans-serif;
+    --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+    --ease: cubic-bezier(.16,1,.3,1);
+}
+
+* { box-sizing: border-box; }
+
+html, body { background: var(--bg); color: var(--text); }
+body { font-family: var(--font-body); margin: 0; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+::selection { background: var(--accent); color: #fff; }
+
+.ph { line-height: 1; vertical-align: -0.125em; }
+
+/* main é passthrough; cada página controla sua largura.
+   O dashboard (.dash) ocupa largura cheia; demais páginas centralizam. */
+main { max-width: 820px; margin: 0 auto; padding: 28px 24px 64px; }
+main:has(.dash) { max-width: none; padding: 0; }
+
+/* ---------- nav ---------- */
+.topnav {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(253, 252, 251, 0.8);
+    backdrop-filter: saturate(180%) blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 1.2rem;
+}
+.brand .ph { color: var(--accent); font-size: 1.25rem; }
+.nav-user { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); margin-left: auto; font-family: var(--font-mono); font-size: 0.78rem; }
+.nav-logout { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-family: var(--font-mono); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; transition: color 0.15s; }
+.nav-logout:hover { color: var(--accent); }
+
+/* ---------- títulos genéricos ---------- */
+h1 { font-family: var(--font-display); font-size: 2rem; font-weight: 400; text-transform: uppercase; letter-spacing: 0.01em; line-height: 1; margin: 0 0 8px; }
+h2 { font-family: var(--font-mono); font-size: 0.74rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.16em; color: var(--text-muted); margin: 36px 0 0; display: flex; align-items: center; gap: 8px; }
+h2 .ph { font-size: 1rem; color: var(--accent); }
+
+/* ---------- auth ---------- */
+.auth-box {
+    max-width: 380px;
+    margin: 72px auto;
+    background: var(--surface);
+    padding: 36px 32px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+.auth-brand { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.02em; color: var(--accent); margin-bottom: 18px; font-size: 1.15rem; }
+.auth-box h1 { font-size: 1.7rem; margin-bottom: 22px; }
+.auth-box form { display: flex; flex-direction: column; gap: 16px; }
+.auth-box label { display: flex; flex-direction: column; gap: 6px; font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); }
+.auth-box input {
+    padding: 11px 13px;
+    border: 1px solid var(--border-2);
+    border-radius: var(--radius-sm);
+    font-size: 0.95rem;
+    font-family: var(--font-body);
+    background: var(--surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.auth-box input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.auth-switch { font-size: 0.88rem; margin-top: 20px; color: var(--text-muted); }
+.auth-switch a, .error a { color: var(--accent); text-decoration: none; }
+.error { color: var(--down); font-size: 0.88rem; }
+
+/* botão (login/cadastro) */
+button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--text);
+    color: #fff;
+    border: none;
+    padding: 13px 20px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-family: var(--font-display);
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    transition: transform 0.12s var(--ease), background 0.2s var(--ease);
+}
+button:hover { background: var(--accent); }
+button:active { transform: scale(0.98); }
+
+/* ---------- detalhe da atividade ---------- */
+.back-link { display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted); text-decoration: none; font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
+.back-link:hover { color: var(--accent); }
+.detail-title { display: flex; align-items: center; gap: 12px; }
+.detail-title .ph { color: var(--accent); font-size: 1.6rem; }
+.activity-date { display: flex; align-items: center; gap: 6px; color: var(--text-muted); margin: 0; font-family: var(--font-mono); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.1em; }
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 14px;
+    margin-top: 22px;
+}
+.stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: var(--shadow);
+}
+.stat-label { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.14em; }
+.stat-value { font-family: var(--font-display); font-size: 1.7rem; line-height: 1; letter-spacing: 0.01em; }
+
+#map { height: 380px; border: 1px solid var(--border); border-radius: var(--radius); margin-top: 16px; }
+#hr-chart { margin-top: 16px; }
+
+.hint { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 0.85rem; margin-top: 14px; }
+.hint .ph { color: var(--accent); }
+.empty { color: var(--text-muted); font-size: 0.92rem; margin-top: 14px; }

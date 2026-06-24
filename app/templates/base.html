@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Stamina{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap">
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    {% block head_extra %}{% endblock %}
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+<body>
+    {% if user %}
+    <nav class="topnav">
+        <a href="/" class="brand"><i class="ph ph-pulse"></i> Stamina</a>
+        <span class="nav-user"><i class="ph ph-user"></i> {{ user.email }}</span>
+        <a href="/logout" class="nav-logout"><i class="ph ph-sign-out"></i> Sair</a>
+    </nav>
+    {% endif %}
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

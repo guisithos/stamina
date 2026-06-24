@@ -1,0 +1,16 @@
+# Mantém o contexto de build enxuto (o Dockerfile só precisa de requirements.txt + app/).
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.db
+.git/
+.gitignore
+lovable/
+README.md
+smoke_test.py
+cookies.txt
+.env
+fly.toml
+Dockerfile
+.dockerignore
