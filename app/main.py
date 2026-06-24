@@ -26,8 +26,44 @@ from .summary import month_name, monthly_summary, week_days
 
 app = FastAPI(title="Stamina")
 
-SECRET_KEY = os.getenv("SECRET_KEY", "troque-essa-chave-antes-de-ir-pra-produção")
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+# Fly injeta FLY_APP_NAME nas máquinas — usamos como sinal de "estou em produção".
+IS_PROD = bool(os.getenv("FLY_APP_NAME"))
+
+# Chave que assina o cookie de sessão. Em produção é OBRIGATÓRIO vir do ambiente
+# (fly secrets set SECRET_KEY=...). Nunca cair num default fixo: como o repositório
+# é público, um default conhecido permitiria forjar a sessão de qualquer usuário.
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    if IS_PROD:
+        raise RuntimeError(
+            "SECRET_KEY não definido em produção. "
+            "Rode: fly secrets set SECRET_KEY=$(python -c \"import secrets;print(secrets.token_hex(32))\")"
+        )
+    SECRET_KEY = "dev-only-inseguro-nao-usar-em-producao"  # só desenvolvimento local
+
+# Tamanho/quantidade máximos de upload — evita exaurir a memória da máquina (256MB).
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB por arquivo (um .fit real tem < 1 MB)
+MAX_FILES_PER_UPLOAD = 25
+
+# Permite fechar o cadastro depois de criar sua conta (ALLOW_REGISTRATION=false).
+ALLOW_REGISTRATION = os.getenv("ALLOW_REGISTRATION", "true").lower() != "false"
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    https_only=IS_PROD,          # cookie só trafega por HTTPS em produção
+    same_site="lax",             # mitiga CSRF em requisições cross-site
+    max_age=60 * 60 * 24 * 14,   # sessão expira em 14 dias
+)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"  # anti-clickjacking
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 BASE_DIR = os.path.dirname(__file__)
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
@@ -52,6 +88,8 @@ def on_startup():
 
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
+    if not ALLOW_REGISTRATION:
+        return RedirectResponse(url="/login", status_code=303)
     return templates.TemplateResponse("register.html", {"request": request, "error": None})
 
 
@@ -62,10 +100,20 @@ def register(
     password: str = Form(...),
     session: Session = Depends(get_session),
 ):
+    if not ALLOW_REGISTRATION:
+        return RedirectResponse(url="/login", status_code=303)
+
+    def _error(msg: str):
+        return templates.TemplateResponse("register.html", {"request": request, "error": msg})
+
+    if len(password) < 8:
+        return _error("A senha precisa de ao menos 8 caracteres.")
+    if len(password.encode("utf-8")) > 72:
+        # bcrypt trunca em 72 bytes silenciosamente — melhor rejeitar.
+        return _error("Senha muito longa (máximo 72 caracteres).")
     if get_user_by_email(session, email):
-        return templates.TemplateResponse(
-            "register.html", {"request": request, "error": "Esse e-mail já está cadastrado."}
-        )
+        return _error("Esse e-mail já está cadastrado.")
+
     user = User(email=email, hashed_password=hash_password(password))
     session.add(user)
     session.commit()
@@ -140,9 +188,11 @@ def upload_activities(
         return RedirectResponse(url="/login", status_code=303)
 
     errors = []
-    for upload in files:
+    for upload in files[:MAX_FILES_PER_UPLOAD]:
         try:
             raw = upload.file.read()
+            if len(raw) > MAX_UPLOAD_BYTES:
+                raise ValueError("arquivo grande demais (máx 10 MB)")
             parsed = parse_fit(raw)
             activity = Activity(
                 user_id=user.id,

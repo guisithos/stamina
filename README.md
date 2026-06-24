@@ -64,8 +64,9 @@ enxuto (não envia `venv/`, `.git`, `lovable/` etc.).
 # instalar a CLI (uma vez): https://fly.io/docs/flyctl/install/
 fly auth login
 
-
-fly launch --no-deploy  
+# IMPORTANTE: passe --region explicitamente. Ao reaproveitar um fly.toml existente,
+# o flyctl às vezes ignora o primary_region e falha com "region  not found".
+fly launch --no-deploy --region gru
 
 # cria o volume persistente (precisa bater com source/region do fly.toml)
 fly volumes create stamina_data --region gru --size 1
