@@ -34,9 +34,17 @@
 
   {# ---------- RESUMO DO MÊS ---------- #}
   <section class="reveal" style="--delay:.15s">
-    <header class="section-head">
-      <h2 class="display-xl">{{ month_name }}</h2>
-      <span class="mono-eyebrow">Resumo Mensal</span>
+    <header class="section-head month-head">
+      <div class="month-switch">
+        <a class="month-arrow" href="/?m={{ month_prev }}" aria-label="Mês anterior"><i class="ph ph-caret-left"></i></a>
+        <h2 class="display-xl">{{ month_name }}</h2>
+        {% if month_next %}
+        <a class="month-arrow" href="/?m={{ month_next }}" aria-label="Próximo mês"><i class="ph ph-caret-right"></i></a>
+        {% else %}
+        <span class="month-arrow is-disabled" aria-hidden="true"><i class="ph ph-caret-right"></i></span>
+        {% endif %}
+      </div>
+      <span class="mono-eyebrow">{{ 'Resumo Mensal' if month_compare else 'Totais do mês' }}</span>
     </header>
 
     {% if month_summary %}
@@ -45,12 +53,14 @@
       <article class="metric-card {% if c.highlight %}metric-card--accent{% endif %}">
         <div class="metric-top">
           <span class="metric-icon"><i class="ph ph-{{ c.icon }}"></i></span>
-          {% if c.pct is none %}
-            <span class="chip chip-new"><i class="ph ph-sparkle"></i> novo</span>
-          {% elif c.pct >= 0 %}
-            <span class="chip chip-up"><i class="ph ph-trend-up"></i> {{ c.pct | round | int }}%</span>
-          {% else %}
-            <span class="chip chip-down"><i class="ph ph-trend-down"></i> {{ (c.pct | abs) | round | int }}%</span>
+          {% if month_compare %}
+            {% if c.pct is none %}
+              <span class="chip chip-new"><i class="ph ph-sparkle"></i> novo</span>
+            {% elif c.pct >= 0 %}
+              <span class="chip chip-up"><i class="ph ph-trend-up"></i> {{ c.pct | round | int }}%</span>
+            {% else %}
+              <span class="chip chip-down"><i class="ph ph-trend-down"></i> {{ (c.pct | abs) | round | int }}%</span>
+            {% endif %}
           {% endif %}
         </div>
         <div class="metric-value">
@@ -60,14 +70,16 @@
         {% if c.show_distance %}
           <div class="metric-sub mono">{{ c.time }}</div>
         {% endif %}
+        {% if month_compare %}
         <div class="metric-note">
           vs. mês anterior ({{ 'distância' if c.compare == 'distance' else 'tempo' }})
         </div>
+        {% endif %}
       </article>
       {% endfor %}
     </div>
     {% else %}
-    <p class="empty">Sem corrida, musculação, bike ou natação registradas neste mês.</p>
+    <p class="empty">Sem corrida, musculação, bike ou natação registradas em {{ month_name }}.</p>
     {% endif %}
   </section>
 
@@ -77,23 +89,6 @@
       <h3 class="display-md">Esta Semana</h3>
       <span class="mono-eyebrow">7 dias</span>
     </header>
-
-    {# barra de stamina: segmentos acendem em brasa a cada dia treinado #}
-    {% set trained = week | selectattr('icons') | list | length %}
-    <div class="stamina">
-      <div class="stamina-track" role="img"
-           aria-label="{{ trained }} de 7 dias treinados nesta semana">
-        {% for d in week %}
-        <span class="stamina-seg
-                     {% if d.icons %}is-filled{% endif %}
-                     {% if d.is_today %}is-today{% endif %}"></span>
-        {% endfor %}
-      </div>
-      <div class="stamina-readout">
-        <span class="stamina-count">{{ trained }}<span class="stamina-total">/7</span></span>
-        <span class="mono-eyebrow">dias em chamas</span>
-      </div>
-    </div>
 
     <div class="week-grid">
       {% for d in week %}
@@ -117,6 +112,11 @@
         </div>
       </div>
       {% endfor %}
+    </div>
+
+    <div class="week-total">
+      <span class="mono-eyebrow">Tempo total na semana</span>
+      <span class="week-total-value display-sm">{{ week_total if week_total else "—" }}</span>
     </div>
   </section>
 

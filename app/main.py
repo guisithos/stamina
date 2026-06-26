@@ -1,7 +1,7 @@
 import json
 import os
 import secrets
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
@@ -28,7 +28,15 @@ from .metrics import (
 )
 from .models import Activity, StrengthSet, User
 from .strength import EXERCISE_GROUPS, EXERCISES, exercise_label, muscles_for
-from .summary import month_name, monthly_summary, week_days
+from .summary import (
+    month_name,
+    month_param,
+    monthly_summary,
+    resolve_month,
+    shift_month,
+    week_days,
+    week_total_time,
+)
 
 app = FastAPI(title="Stamina")
 
@@ -189,7 +197,7 @@ def logout(request: Request):
 # ---------- dashboard ----------
 
 @app.get("/", response_class=HTMLResponse)
-def dashboard(request: Request, session: Session = Depends(get_session)):
+def dashboard(request: Request, m: str = "", session: Session = Depends(get_session)):
     user = get_current_user(request, session)
     if not user:
         return RedirectResponse(url="/login", status_code=303)
@@ -201,15 +209,24 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
     )
     activities = session.exec(statement).all()
     now = datetime.now()
+
+    ref = resolve_month(m, now)  # mês selecionado (dia 1), nunca além do atual
+    is_current = (ref.year, ref.month) == (now.year, now.month)
+    nxt = shift_month(ref, 1)
     return templates.TemplateResponse(
         "dashboard.html",
         {
             "request": request,
             "user": user,
             "activities": activities,
-            "month_summary": monthly_summary(activities, now),
-            "month_name": month_name(now),
-            "week": week_days(activities, now),
+            # comparativo % só no mês atual; meses passados mostram só os totais
+            "month_summary": monthly_summary(activities, ref, compare=is_current),
+            "month_name": month_name(ref),
+            "month_compare": is_current,
+            "month_prev": month_param(shift_month(ref, -1)),
+            "month_next": month_param(nxt) if nxt <= date(now.year, now.month, 1) else None,
+            "week": week_days(activities, now),  # "Esta semana" é sempre a semana atual
+            "week_total": week_total_time(activities, now),
         },
     )
 

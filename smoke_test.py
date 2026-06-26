@@ -58,12 +58,17 @@ from datetime import datetime as _dt
 from sqlmodel import Session, select
 from app.database import engine
 from app.models import Activity, User
-from app.summary import monthly_summary, week_days
+from app.summary import monthly_summary, week_days, resolve_month, week_total_time
 ref = _dt(2026, 5, 31)
 with Session(engine) as s:
     acts = s.exec(select(Activity)).all()
 cards = monthly_summary(acts, ref)
 print("  esportes no resumo de maio:", [c["label"] for c in cards])
+# meses passados: sem comparativo (pct None em todos)
+cards_nocmp = monthly_summary(acts, ref, compare=False)
+print("  compare=False zera o pct:", all(c["pct"] is None for c in cards_nocmp))
+print("  resolve_month('2026-05'):", resolve_month("2026-05", _dt(2026, 6, 27)))
+print("  resolve_month futuro capado p/ atual:", resolve_month("2027-01", _dt(2026, 6, 27)).month == 6)
 musc = next(c for c in cards if c["label"] == "Musculação")
 print("  musculação mostra distância?", musc["show_distance"], "(esperado False)")
 print("  musculação compara por:", musc["compare"], "(esperado time)")
@@ -72,6 +77,7 @@ print("  destaque (maior tempo no mês):", destaque, "(esperado Musculação)")
 week = week_days(acts, ref)
 dias_com_atividade = [(d["label"], d["day"], len(d["icons"]), d["total_time"]) for d in week if d["icons"]]
 print("  dias da semana 25-31/05 (label, dia, nº ícones, tempo):", dias_com_atividade)
+print("  tempo total da semana 25-31/05:", week_total_time(acts, ref), "(esperado 54min)")
 
 print("--- musculação: registrar série + mapa muscular ---")
 r = client.post(f"/activities/{musc_id}/sets", data={"exercise": "supino_reto", "reps": "10", "weight": "40"})
@@ -198,6 +204,13 @@ det_old = client.get(f"/activities/{esteira_id}").text
 print("  última corrida tem análise:", 'class="analysis"' in det_latest)
 print("  tem frase comparativa:", "vs suas últimas" in det_latest)
 print("  corrida antiga NÃO tem análise:", 'class="analysis"' not in det_old)
+
+print("--- navegação de mês ---")
+r_now = client.get("/").text
+r_past = client.get("/?m=2025-11").text
+print("  mês atual tem setas:", 'class="month-arrow"' in r_now)
+print("  navega p/ Novembro de 2025:", "Novembro de 2025" in r_past)
+print("  mês passado SEM comparativo:", "vs. mês anterior" not in r_past)
 
 print("--- exclusão (htmx delete) ---")
 r = client.delete(f"/activities/{musc_id}")

@@ -75,23 +75,47 @@ def month_name(ref_date) -> str:
     return f"{MONTHS_PT[ref.month]} de {ref.year}"
 
 
-def monthly_summary(activities, ref_date) -> list[dict]:
+def resolve_month(m, now) -> date:
+    """Mês selecionado (date no dia 1) a partir do parâmetro 'YYYY-MM'.
+    Sem parâmetro/ inválido → mês atual. Nunca passa do mês atual (sem futuro)."""
+    cur = date(now.year, now.month, 1)
+    try:
+        y, mo = str(m).split("-")
+        ref = date(int(y), int(mo), 1)
+    except (ValueError, AttributeError):
+        return cur
+    return min(ref, cur)
+
+
+def shift_month(ref: date, delta: int) -> date:
+    idx = ref.year * 12 + (ref.month - 1) + delta
+    return date(idx // 12, idx % 12 + 1, 1)
+
+
+def month_param(ref: date) -> str:
+    return f"{ref.year}-{ref.month:02d}"
+
+
+def monthly_summary(activities, ref_date, compare: bool = True) -> list[dict]:
+    """Resumo do mês de `ref_date`. Com `compare=True` calcula a variação % vs o mês
+    anterior (só faz sentido no mês atual); ao navegar pra meses passados, compare=False
+    e mostramos só os totais."""
     ref = _as_date(ref_date)
     cur_start, cur_end = _month_bounds(ref)
-    prev_start, prev_end = _month_bounds(cur_start - timedelta(days=1))
+    if compare:
+        prev_start, prev_end = _month_bounds(cur_start - timedelta(days=1))
 
     cards = []
     for cfg in MONTH_SPORTS:
         cur_dist, cur_secs = _totals(activities, cfg["sport"], cur_start, cur_end)
-        prev_dist, prev_secs = _totals(activities, cfg["sport"], prev_start, prev_end)
 
         if cur_dist == 0 and cur_secs == 0:  # só mostra esporte praticado neste mês
             continue
 
-        if cfg["compare"] == "distance":
-            pct = _pct(cur_dist, prev_dist)
-        else:
-            pct = _pct(cur_secs, prev_secs)
+        pct = None
+        if compare:
+            prev_dist, prev_secs = _totals(activities, cfg["sport"], prev_start, prev_end)
+            pct = _pct(cur_dist, prev_dist) if cfg["compare"] == "distance" else _pct(cur_secs, prev_secs)
 
         cards.append({
             "label": cfg["label"],
@@ -110,6 +134,15 @@ def monthly_summary(activities, ref_date) -> list[dict]:
     if cards:
         max(cards, key=lambda c: c["secs"])["highlight"] = True
     return cards
+
+
+def week_total_time(activities, ref_date) -> str:
+    """Tempo total de TODAS as atividades da semana (segunda→domingo), compacto."""
+    ref = _as_date(ref_date)
+    monday = ref - timedelta(days=ref.weekday())
+    week_end = monday + timedelta(days=7)  # exclusivo (domingo inclusive)
+    total = sum(a.total_time_s or 0 for a in activities if monday <= a.start_time.date() < week_end)
+    return _fmt_hm(total)
 
 
 def week_days(activities, ref_date) -> list[dict]:
