@@ -172,6 +172,23 @@ print("  detalhe bike tem form de distância:", 'name="distance_km"' in client.g
 ig = client.get("/integracao")
 print("  página integração:", ig.status_code, "| contém /ingest/hae:", "/ingest/hae" in ig.text)
 
+print("--- HAE: nome 'Correr' + tempo em movimento (pausa) ---")
+import datetime as _dtm
+from app.hae_parser import resolve_sport, parse_hae_workout
+print("  'Correr' -> running:", resolve_sport("Correr")[0] == "running")
+_base = _dtm.datetime(2026, 6, 26, 19, 0, 0)
+_route = [{"latitude": round(-28.38 + i * 0.0003, 6), "longitude": -53.93, "altitude": 480,
+           "timestamp": (_base + _dtm.timedelta(seconds=i * 10)).strftime("%Y-%m-%d %H:%M:%S -0300")}
+          for i in range(41)]  # 0..400s movendo
+_route += [{"latitude": round(-28.38 + 40 * 0.0003, 6), "longitude": -53.93, "altitude": 480,
+            "timestamp": (_base + _dtm.timedelta(seconds=410 + i * 10)).strftime("%Y-%m-%d %H:%M:%S -0300")}
+           for i in range(21)]  # 410..610s parado
+_wk = {"id": "PAUSE", "name": "Correr", "start": _base.strftime("%Y-%m-%d %H:%M:%S -0300"),
+       "duration": 610, "distance": {"qty": 1.3, "units": "km"}, "route": _route}
+_p = parse_hae_workout(_wk)
+print(f"  duration HAE=610s -> total_time_s (movimento)={_p['total_time_s']}s (esperado ~400, < 610)")
+print("  sport:", _p["sport"], "(esperado running)")
+
 print("--- análise (só na corrida mais recente) ---")
 with Session(engine) as s:
     run_latest = s.exec(select(Activity).where(Activity.external_id == "HAE-ABC-123")).first().id

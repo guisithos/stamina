@@ -6,7 +6,7 @@ e devolve estruturas prontas pro template. A data de referência é injetada
 """
 from datetime import date, datetime, timedelta
 
-from .metrics import format_distance, format_duration, sport_icon
+from .metrics import format_distance, sport_icon
 
 # Esportes do resumo mensal: rótulo, se mostra distância e qual valor dirige a
 # comparação percentual com o mês anterior.
@@ -98,7 +98,7 @@ def monthly_summary(activities, ref_date) -> list[dict]:
             "icon": sport_icon(cfg["sport"]),
             "show_distance": cfg["show_distance"],
             "distance": format_distance(cur_dist),
-            "time": format_duration(cur_secs),
+            "time": _fmt_hm(cur_secs),  # compacto (1h59 / 38min) — total do mês não precisa de seg.
             "pct": pct,
             "compare": cfg["compare"],
             "secs": cur_secs,      # volume (tempo total) p/ escolher o destaque

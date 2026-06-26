@@ -15,6 +15,7 @@ Decisões:
   (pontos de rota com hr=None + pontos de FC com lat/lon=None). Cada consumidor
   já filtra: o mapa usa só pontos com lat/lon, o gráfico só pontos com hr.
 """
+import math
 import unicodedata
 from datetime import datetime
 from typing import Any, Optional
@@ -28,7 +29,7 @@ from .fit_parser import friendly_sport
 _SPORT_KEYWORDS: list[tuple[tuple[str, ...], tuple[str, Optional[str]]]] = [
     (("ciclis", "cycl", "bike", "pedal", "spinning"), ("cycling", None)),
     (("forca", "strength", "muscula", "funcional", "weight", "resistenc"), ("training", "strength_training")),
-    (("corrida", "run", "treadmill", "esteira"), ("running", None)),
+    (("corr", "run", "treadmill", "esteira"), ("running", None)),  # corr- pega corrida/correr/correndo
     (("caminh", "walk", "hik", "trilha"), ("walking", None)),
     (("nata", "swim"), ("swimming", None)),
 ]
@@ -97,6 +98,36 @@ def _distance_m(distance: Any) -> Optional[float]:
     return qty * 1000  # km (padrão)
 
 
+def _haversine(lat1, lon1, lat2, lon2) -> float:
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlmb = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlmb / 2) ** 2
+    return 2 * 6371000 * math.asin(math.sqrt(a))
+
+
+def _moving_time_s(route, min_speed: float = 0.5, max_dt: float = 30) -> float:
+    """Tempo em movimento a partir do GPS (estilo Strava): soma os intervalos em que
+    houve deslocamento real, descartando paradas (água/banheiro) e gaps. O HAE manda
+    `duration` = tempo total (com pausa); isso reconstrói o tempo de relógio em movimento."""
+    pts = []
+    for p in route or []:
+        t = _parse_dt(p.get("timestamp"))
+        lat, lon = p.get("latitude"), p.get("longitude")
+        if t and lat is not None and lon is not None:
+            pts.append((t, lat, lon))
+    pts.sort(key=lambda x: x[0])
+    moving = 0.0
+    for (t1, la1, lo1), (t2, la2, lo2) in zip(pts, pts[1:]):
+        dt = (t2 - t1).total_seconds()
+        if dt <= 0:
+            continue
+        d = _haversine(la1, lo1, la2, lo2)
+        if dt <= max_dt and d / dt >= min_speed:  # movendo, sem gap grande
+            moving += dt
+    return moving
+
+
 def _calories(energy: Any) -> Optional[int]:
     qty = _qty(energy)
     if qty is None:
@@ -154,12 +185,21 @@ def parse_hae_workout(w: dict[str, Any]) -> dict[str, Any]:
     max_hr = _qty(w.get("maxHeartRate"))
     min_hr = min(hr_values) if hr_values else None
 
+    # Tempo: usa o `duration` do HAE, mas se houver GPS e o tempo em movimento for
+    # claramente menor (pausas), usa o de movimento — pra o pace bater com o relógio.
+    duration = w.get("duration")
+    total_time_s = duration
+    if has_gps and duration:
+        mv = _moving_time_s(w.get("route"))
+        if mv and 0.5 * duration <= mv < 0.98 * duration:
+            total_time_s = round(mv)
+
     return {
         "sport": sport,
         "sub_sport": sub_sport,
         "label": friendly_sport(sport, sub_sport),
         "start_time": _parse_dt(w.get("start")),
-        "total_time_s": w.get("duration"),
+        "total_time_s": total_time_s,
         "avg_hr": round(avg_hr) if avg_hr is not None else None,
         "min_hr": min_hr,
         "max_hr": round(max_hr) if max_hr is not None else None,
