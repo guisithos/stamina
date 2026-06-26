@@ -12,10 +12,10 @@ from sqlmodel import Session, select
 from starlette.middleware.sessions import SessionMiddleware
 
 from .auth import get_current_user, get_user_by_email, hash_password, verify_password
-from .database import create_db_and_tables, get_session, run_light_migrations
-from .fit_parser import parse_fit
+from .database import create_db_and_tables, engine, get_session, run_light_migrations
+from .fit_parser import friendly_sport, parse_fit
 from .geo import track_to_geojson
-from .hae_parser import parse_hae_workout
+from .hae_parser import parse_hae_workout, resolve_sport
 from .metrics import (
     activity_metrics,
     format_date,
@@ -87,10 +87,33 @@ templates.env.globals["sport_icon"] = sport_icon
 templates.env.globals["exercise_label"] = exercise_label
 
 
+KNOWN_SPORTS = {"running", "cycling", "training", "walking", "swimming"}
+
+
+def normalize_hae_sports() -> None:
+    """Conserta atividades do HAE que entraram com `sport` genérico (nome do treino
+    veio localizado e não foi reconhecido). Re-deriva pelo rótulo. Idempotente."""
+    with Session(engine) as session:
+        activities = session.exec(select(Activity).where(Activity.source == "hae")).all()
+        changed = 0
+        for a in activities:
+            if a.sport in KNOWN_SPORTS:
+                continue
+            sport, sub = resolve_sport(a.label or a.sport)
+            if sport in KNOWN_SPORTS:
+                a.sport, a.sub_sport, a.label = sport, sub, friendly_sport(sport, sub)
+                session.add(a)
+                changed += 1
+        if changed:
+            session.commit()
+            print(f"[startup] sports do HAE normalizados: {changed}")
+
+
 @app.on_event("startup")
 def on_startup():
     create_db_and_tables()
     run_light_migrations()
+    normalize_hae_sports()
 
 
 # ---------- auth ----------
@@ -443,6 +466,33 @@ def integration_regenerate(request: Request, session: Session = Depends(get_sess
     session.add(user)
     session.commit()
     return RedirectResponse(url="/integracao", status_code=303)
+
+
+@app.post("/activities/{activity_id}/note")
+def edit_note(
+    request: Request,
+    activity_id: int,
+    rpe: str = Form(""),
+    note: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    """Salva RPE (0–10) e a nota livre do treino."""
+    user = get_current_user(request, session)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    activity = session.get(Activity, activity_id)
+    if not activity or activity.user_id != user.id:
+        return RedirectResponse(url="/", status_code=303)
+
+    try:
+        r = int(rpe)
+        activity.rpe = r if 0 <= r <= 10 else None
+    except (TypeError, ValueError):
+        activity.rpe = None
+    activity.note = note.strip() or None
+    session.add(activity)
+    session.commit()
+    return RedirectResponse(url=f"/activities/{activity_id}", status_code=303)
 
 
 @app.post("/activities/{activity_id}/distance")

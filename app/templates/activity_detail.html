@@ -39,6 +39,25 @@
 </form>
 {% endif %}
 
+<section class="workout-log">
+    <h2><i class="ph ph-note-pencil"></i> Como foi o treino?</h2>
+    <form method="post" action="/activities/{{ activity.id }}/note">
+        <div class="rpe">
+            <div class="rpe-head">
+                <span class="rpe-title">Esforço percebido (RPE)</span>
+                <span class="rpe-readout">
+                    <strong id="rpe-value">{{ activity.rpe if activity.rpe is not none else 7 }}</strong><span id="rpe-desc"></span>
+                </span>
+            </div>
+            <input type="range" id="rpe-slider" name="rpe" min="0" max="10" step="1"
+                   value="{{ activity.rpe if activity.rpe is not none else 7 }}">
+            <div class="rpe-scale"><span>0 · leve</span><span>10 · máximo</span></div>
+        </div>
+        <textarea name="note" rows="4" placeholder="O que foi feito, como você se sentiu, ajustes pra próxima…">{{ activity.note or '' }}</textarea>
+        <button type="submit"><i class="ph ph-check"></i> Salvar</button>
+    </form>
+</section>
+
 {% if activity.sport == 'training' %}
 <section id="strength-section" hx-on::after-swap="window.initMuscleMap && window.initMuscleMap()">
     {% include "_strength.html" %}
@@ -58,6 +77,37 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script>
+    // Slider de RPE: cor verde→vermelho-escuro conforme o esforço + rótulo RIR ao vivo.
+    (function () {
+        const slider = document.getElementById('rpe-slider');
+        if (!slider) return;
+        const valEl = document.getElementById('rpe-value');
+        const descEl = document.getElementById('rpe-desc');
+        const DESC = {
+            10: 'RIR 0 · esforço máximo',
+            9: 'RIR 1 · extremamente difícil',
+            8: 'RIR 2 · muito pesado',
+            7: 'RIR 3 · pesado',
+            6: 'RIR 4 · moderado',
+        };
+        function colorFor(v) {
+            const hue = 120 - (v / 10) * 120;       // 120 (verde) -> 0 (vermelho)
+            const light = 45 - (v / 10) * 12;       // escurece no topo (vermelho escuro)
+            return `hsl(${hue}, 70%, ${light}%)`;
+        }
+        function update() {
+            const v = +slider.value;
+            valEl.textContent = v;
+            descEl.textContent = ' · ' + (DESC[v] || 'RIR 5+ · leve');
+            const c = colorFor(v);
+            slider.style.setProperty('--rpe-color', c);
+            valEl.style.color = c;
+        }
+        slider.addEventListener('input', update);
+        update();
+    })();
+</script>
 {% if activity.sport == 'training' %}
 <script type="module">
     // Mapa muscular (body-highlighter, MIT, via CDN ESM — sem build step).

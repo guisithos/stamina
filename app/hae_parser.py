@@ -15,25 +15,42 @@ Decisões:
   (pontos de rota com hr=None + pontos de FC com lat/lon=None). Cada consumidor
   já filtra: o mapa usa só pontos com lat/lon, o gráfico só pontos com hr.
 """
+import unicodedata
 from datetime import datetime
 from typing import Any, Optional
 
 from .fit_parser import friendly_sport
 
-# Nome do workout no Apple Health/HAE -> (sport, sub_sport) no nosso vocabulário.
-HAE_SPORT_MAP: dict[str, tuple[str, Optional[str]]] = {
-    "Running": ("running", None),
-    "Walking": ("walking", None),
-    "Hiking": ("walking", None),
-    "Cycling": ("cycling", None),
-    "Indoor Cycling": ("cycling", "indoor_cycling"),
-    "Traditional Strength Training": ("training", "strength_training"),
-    "Functional Strength Training": ("training", "strength_training"),
-    "Core Training": ("training", "strength_training"),
-    "Swimming": ("swimming", None),
-    "Pool Swimming": ("swimming", None),
-    "Open Water Swimming": ("swimming", None),
-}
+# IMPORTANTE: o Health Auto Export manda o `name` do treino no IDIOMA do iPhone
+# (ex.: "Treinamento de Força Tradicional", "Ciclismo Interno"). Por isso a
+# resolução é por PALAVRA-CHAVE, sem acento e sem depender da ordem — funciona em
+# pt e en. Cada tupla é (lista de termos, (sport, sub_sport)); o primeiro que casar vence.
+_SPORT_KEYWORDS: list[tuple[tuple[str, ...], tuple[str, Optional[str]]]] = [
+    (("ciclis", "cycl", "bike", "pedal", "spinning"), ("cycling", None)),
+    (("forca", "strength", "muscula", "funcional", "weight", "resistenc"), ("training", "strength_training")),
+    (("corrida", "run", "treadmill", "esteira"), ("running", None)),
+    (("caminh", "walk", "hik", "trilha"), ("walking", None)),
+    (("nata", "swim"), ("swimming", None)),
+]
+_INDOOR_TERMS = ("indoor", "intern", "esteira", "treadmill", "sala", "esteira")
+
+
+def _strip_accents(text: str) -> str:
+    return "".join(c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn")
+
+
+def resolve_sport(name: Optional[str]) -> tuple[str, Optional[str]]:
+    """Mapeia o nome do workout (em qualquer idioma) para (sport, sub_sport)."""
+    n = _strip_accents(name or "").lower()
+    indoor = any(t in n for t in _INDOOR_TERMS)
+    for terms, (sport, sub) in _SPORT_KEYWORDS:
+        if any(t in n for t in terms):
+            if sport == "cycling" and indoor:
+                sub = "indoor_cycling"
+            elif sport == "running" and indoor:
+                sub = "treadmill"
+            return (sport, sub)
+    return (n.replace(" ", "_") or "unknown", None)
 
 
 def _parse_dt(value: Optional[str]) -> Optional[datetime]:
@@ -92,7 +109,7 @@ def _calories(energy: Any) -> Optional[int]:
 
 def parse_hae_workout(w: dict[str, Any]) -> dict[str, Any]:
     name = w.get("name") or ""
-    sport, sub_sport = HAE_SPORT_MAP.get(name, (name.lower().replace(" ", "_") or "unknown", None))
+    sport, sub_sport = resolve_sport(name)
 
     # --- pontos do percurso: rota (lat/lon) + FC (hr), streams separados ---
     track_points: list[dict[str, Any]] = []

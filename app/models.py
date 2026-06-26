@@ -50,6 +50,10 @@ class Activity(SQLModel, table=True):
     # Quando o volume de dados crescer, isso migra pra uma tabela própria.
     track_points_json: Optional[str] = None
 
+    # Registro subjetivo do treino (preenchido manualmente no detalhe).
+    rpe: Optional[int] = None      # esforço percebido (0–10); RIR ≈ 10 - rpe
+    note: Optional[str] = None     # nota livre: como foi, o que foi feito
+
     raw_filename: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

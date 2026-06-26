@@ -101,7 +101,14 @@ def monthly_summary(activities, ref_date) -> list[dict]:
             "time": format_duration(cur_secs),
             "pct": pct,
             "compare": cfg["compare"],
+            "secs": cur_secs,      # volume (tempo total) p/ escolher o destaque
+            "highlight": False,
         })
+
+    # Destaca o esporte de MAIOR volume no mês (tempo total) — denominador comum
+    # justo entre esportes (musculação não tem distância). Empate: o primeiro.
+    if cards:
+        max(cards, key=lambda c: c["secs"])["highlight"] = True
     return cards
 
 

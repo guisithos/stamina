@@ -42,7 +42,7 @@
     {% if month_summary %}
     <div class="metric-grid">
       {% for c in month_summary %}
-      <article class="metric-card {% if loop.index == 3 %}metric-card--accent{% endif %}">
+      <article class="metric-card {% if c.highlight %}metric-card--accent{% endif %}">
         <div class="metric-top">
           <span class="metric-icon"><i class="ph ph-{{ c.icon }}"></i></span>
           {% if c.pct is none %}

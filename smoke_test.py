@@ -67,6 +67,8 @@ print("  esportes no resumo de maio:", [c["label"] for c in cards])
 musc = next(c for c in cards if c["label"] == "Musculação")
 print("  musculação mostra distância?", musc["show_distance"], "(esperado False)")
 print("  musculação compara por:", musc["compare"], "(esperado time)")
+destaque = next((c["label"] for c in cards if c["highlight"]), None)
+print("  destaque (maior tempo no mês):", destaque, "(esperado Musculação)")
 week = week_days(acts, ref)
 dias_com_atividade = [(d["label"], d["day"], len(d["icons"]), d["total_time"]) for d in week if d["icons"]]
 print("  dias da semana 25-31/05 (label, dia, nº ícones, tempo):", dias_com_atividade)
@@ -86,6 +88,16 @@ print("  remove série status:", rd.status_code, "| zerou:", "Nenhuma série" in
 rej = client.post(f"/activities/{caminhada_id}/sets", data={"exercise": "supino_reto", "reps": "8"})
 print("  caminhada rejeita série (404):", rej.status_code)
 
+print("--- nota + RPE do treino ---")
+r = client.post(f"/activities/{musc_id}/note",
+                data={"rpe": "8", "note": "Treino pesado, foco em peito"}, follow_redirects=True)
+print("  nota salva e exibida:", "Treino pesado, foco em peito" in r.text)
+print("  slider reflete rpe=8:", 'value="8"' in r.text)
+client.post(f"/activities/{musc_id}/note", data={"rpe": "99", "note": "   "})  # rpe fora da faixa, nota vazia
+with Session(engine) as s:
+    a = s.get(Activity, musc_id)
+    print("  rpe inválido -> None:", a.rpe is None, "| nota vazia -> None:", a.note is None)
+
 print("--- bike indoor: editar distância + velocidade derivada ---")
 with Session(engine) as s:
     bike = Activity(user_id=1, sport="cycling", sub_sport="indoor_cycling", label="Bicicleta",
@@ -103,35 +115,60 @@ print("--- ingestão Health Auto Export (token + idempotência) ---")
 with Session(engine) as s:
     tok = s.exec(select(User).where(User.id == 1)).first().ingest_token
 print("  usuário tem ingest_token?", bool(tok))
-hae_payload = {"data": {"workouts": [{
-    "id": "HAE-ABC-123",
-    "name": "Running",
-    "start": "2026-05-30 07:00:00 -0300",
-    "end": "2026-05-30 07:30:00 -0300",
-    "duration": 1800,
-    "distance": {"qty": 5.0, "units": "km"},
-    "activeEnergyBurned": {"qty": 300, "units": "kcal"},
-    "avgHeartRate": {"qty": 150, "units": "bpm"},
-    "maxHeartRate": {"qty": 175, "units": "bpm"},
-    "heartRateData": [
-        {"date": "2026-05-30 07:05:00 -0300", "Min": 140, "Avg": 150, "Max": 160, "units": "bpm"},
-        {"date": "2026-05-30 07:15:00 -0300", "Min": 145, "Avg": 155, "Max": 170, "units": "bpm"},
-    ],
-    "route": [
-        {"latitude": -28.380, "longitude": -53.930, "altitude": 480, "timestamp": "2026-05-30 07:00:05 -0300", "speed": 2.8},
-        {"latitude": -28.381, "longitude": -53.931, "altitude": 483, "timestamp": "2026-05-30 07:00:10 -0300", "speed": 2.9},
-    ],
-}]}}
+hae_payload = {"data": {"workouts": [
+    {
+        "id": "HAE-ABC-123",
+        "name": "Running",
+        "start": "2026-05-30 07:00:00 -0300",
+        "end": "2026-05-30 07:30:00 -0300",
+        "duration": 1800,
+        "distance": {"qty": 5.0, "units": "km"},
+        "activeEnergyBurned": {"qty": 300, "units": "kcal"},
+        "avgHeartRate": {"qty": 150, "units": "bpm"},
+        "maxHeartRate": {"qty": 175, "units": "bpm"},
+        "heartRateData": [
+            {"date": "2026-05-30 07:05:00 -0300", "Min": 140, "Avg": 150, "Max": 160, "units": "bpm"},
+            {"date": "2026-05-30 07:15:00 -0300", "Min": 145, "Avg": 155, "Max": 170, "units": "bpm"},
+        ],
+        "route": [
+            {"latitude": -28.380, "longitude": -53.930, "altitude": 480, "timestamp": "2026-05-30 07:00:05 -0300", "speed": 2.8},
+            {"latitude": -28.381, "longitude": -53.931, "altitude": 483, "timestamp": "2026-05-30 07:00:10 -0300", "speed": 2.9},
+        ],
+    },
+    {  # nome localizado (pt) — deve mapear para musculação mesmo assim
+        "id": "HAE-MUSC-1",
+        "name": "Treinamento de Força Tradicional",
+        "start": "2026-05-30 18:00:00 -0300",
+        "end": "2026-05-30 18:40:00 -0300",
+        "duration": 2400,
+        "avgHeartRate": {"qty": 110, "units": "bpm"},
+        "maxHeartRate": {"qty": 150, "units": "bpm"},
+    },
+    {  # nome localizado (pt) — deve mapear para bike indoor
+        "id": "HAE-BIKE-1",
+        "name": "Ciclismo Interno",
+        "start": "2026-05-30 19:00:00 -0300",
+        "end": "2026-05-30 19:30:00 -0300",
+        "duration": 1800,
+    },
+]}}
 hdr = {"Authorization": f"Bearer {tok}"}
 r = client.post("/ingest/hae", json=hae_payload, headers=hdr)
-print("  1º POST:", r.status_code, r.json())
+print("  1º POST:", r.status_code, r.json(), "(esperado created=3)")
 r2 = client.post("/ingest/hae", json=hae_payload, headers=hdr)
-print("  reenvio idempotente:", r2.json())
+print("  reenvio idempotente:", r2.json(), "(esperado duplicates=3)")
 bad = client.post("/ingest/hae", json=hae_payload, headers={"Authorization": "Bearer invalido"})
 print("  token inválido:", bad.status_code, "(esperado 401)")
 with Session(engine) as s:
-    a = s.exec(select(Activity).where(Activity.source == "hae")).first()
-    print(f"  atividade HAE: label={a.label} has_gps={a.has_gps} dist_m={a.distance_m} ext={a.external_id}")
+    run = s.exec(select(Activity).where(Activity.external_id == "HAE-ABC-123")).first()
+    musc = s.exec(select(Activity).where(Activity.external_id == "HAE-MUSC-1")).first()
+    bike = s.exec(select(Activity).where(Activity.external_id == "HAE-BIKE-1")).first()
+    print(f"  corrida: sport={run.sport} has_gps={run.has_gps} dist_m={run.distance_m}")
+    print(f"  musculação (nome pt): sport={musc.sport} (esperado training)")
+    print(f"  bike interno (nome pt): sport={bike.sport}/{bike.sub_sport} (esperado cycling/indoor_cycling)")
+    musc_hae_id, bike_hae_id = musc.id, bike.id
+print("  detalhe musculação tem seção de força:", 'id="strength-section"' in client.get(f"/activities/{musc_hae_id}").text)
+print("  detalhe bike tem form de distância:", 'name="distance_km"' in client.get(f"/activities/{bike_hae_id}").text)
 ig = client.get("/integracao")
 print("  página integração:", ig.status_code, "| contém /ingest/hae:", "/ingest/hae" in ig.text)
 
