@@ -13,6 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from .auth import get_current_user, get_user_by_email, hash_password, verify_password
 from .database import create_db_and_tables, engine, get_session, run_light_migrations
+from .analysis import build_run_analysis
 from .fit_parser import friendly_sport, parse_fit
 from .geo import track_to_geojson
 from .hae_parser import parse_hae_workout, resolve_sport
@@ -347,6 +348,22 @@ def activity_detail(
     context = {"request": request, "user": user, "activity": activity}
     if activity.sport == "training":  # musculação ganha o registro de séries + mapa muscular
         context.update(_strength_context(activity, session))
+    elif activity.sport == "running":
+        # Análise comparativa só na corrida MAIS RECENTE (por ora).
+        latest_run = session.exec(
+            select(Activity)
+            .where(Activity.user_id == user.id, Activity.sport == "running")
+            .order_by(Activity.start_time.desc())
+        ).first()
+        if latest_run and latest_run.id == activity.id:
+            previous = session.exec(
+                select(Activity)
+                .where(Activity.user_id == user.id, Activity.sport == "running",
+                       Activity.start_time < activity.start_time)
+                .order_by(Activity.start_time.desc())
+                .limit(5)
+            ).all()
+            context["analysis"] = build_run_analysis(activity, list(previous))
     return templates.TemplateResponse("activity_detail.html", context)
 
 

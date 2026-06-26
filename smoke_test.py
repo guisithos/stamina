@@ -172,6 +172,16 @@ print("  detalhe bike tem form de distância:", 'name="distance_km"' in client.g
 ig = client.get("/integracao")
 print("  página integração:", ig.status_code, "| contém /ingest/hae:", "/ingest/hae" in ig.text)
 
+print("--- análise (só na corrida mais recente) ---")
+with Session(engine) as s:
+    run_latest = s.exec(select(Activity).where(Activity.external_id == "HAE-ABC-123")).first().id
+    esteira_id = s.exec(select(Activity).where(Activity.label == "Corrida (esteira)")).first().id
+det_latest = client.get(f"/activities/{run_latest}").text
+det_old = client.get(f"/activities/{esteira_id}").text
+print("  última corrida tem análise:", 'class="analysis"' in det_latest)
+print("  tem frase comparativa:", "vs suas últimas" in det_latest)
+print("  corrida antiga NÃO tem análise:", 'class="analysis"' not in det_old)
+
 print("--- exclusão (htmx delete) ---")
 r = client.delete(f"/activities/{musc_id}")
 print("status:", r.status_code)

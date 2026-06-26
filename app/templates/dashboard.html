@@ -3,8 +3,8 @@
 {% block title %}Stamina{% endblock %}
 
 {% block head_extra %}
-{# fontes (Anton/Inter/JetBrains Mono) e Phosphor já vêm do base.html #}
-<link rel="stylesheet" href="/static/dashboard.css">
+{# fontes (Fraunces/IBM Plex Sans/IBM Plex Mono) e Phosphor já vêm do base.html #}
+<link rel="stylesheet" href="/static/dashboard.css?v=20260627">
 {% endblock %}
 
 {% block content %}
@@ -77,6 +77,24 @@
       <h3 class="display-md">Esta Semana</h3>
       <span class="mono-eyebrow">7 dias</span>
     </header>
+
+    {# barra de stamina: segmentos acendem em brasa a cada dia treinado #}
+    {% set trained = week | selectattr('icons') | list | length %}
+    <div class="stamina">
+      <div class="stamina-track" role="img"
+           aria-label="{{ trained }} de 7 dias treinados nesta semana">
+        {% for d in week %}
+        <span class="stamina-seg
+                     {% if d.icons %}is-filled{% endif %}
+                     {% if d.is_today %}is-today{% endif %}"></span>
+        {% endfor %}
+      </div>
+      <div class="stamina-readout">
+        <span class="stamina-count">{{ trained }}<span class="stamina-total">/7</span></span>
+        <span class="mono-eyebrow">dias em chamas</span>
+      </div>
+    </div>
+
     <div class="week-grid">
       {% for d in week %}
       <div class="week-cell

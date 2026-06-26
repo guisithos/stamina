@@ -25,6 +25,36 @@
     {% endif %}
 </div>
 
+{% if analysis %}
+<section class="analysis">
+    <h2><i class="ph ph-chart-line-up"></i> Análise da corrida</h2>
+    <p class="analysis-summary">{{ analysis.summary }}</p>
+
+    {% if analysis.deltas %}
+    <div class="analysis-deltas">
+        {% for d in analysis.deltas %}
+        <div class="adelta adelta--{{ d.tone }}">
+            <span class="ad-label mono">{{ d.label }}</span>
+            <span class="ad-value">{{ d.value }}</span>
+            <span class="ad-delta">{{ d.delta }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if analysis.verdict %}<p class="analysis-verdict">{{ analysis.verdict }}</p>{% endif %}
+    {% if analysis.decoupling %}
+    <p class="analysis-note adelta--{{ analysis.decoupling.tone }}">
+        <i class="ph ph-{{ analysis.decoupling.icon }}"></i> {{ analysis.decoupling.text }}
+    </p>
+    {% endif %}
+
+    {% if analysis.baseline_n %}
+    <p class="hint">Comparado com suas {{ analysis.baseline_n }} corridas anteriores · EF = velocidade ÷ FC média.</p>
+    {% endif %}
+</section>
+{% endif %}
+
 {% if activity.sport == 'cycling' and not activity.has_gps %}
 <form class="inline-edit" method="post" action="/activities/{{ activity.id }}/distance">
     <label for="distance_km">Distância (bike indoor)</label>
@@ -115,7 +145,7 @@
     import createBodyHighlighter from "https://esm.sh/body-highlighter@3.0.2";
 
     const STYLE = { width: "8.5rem" };
-    const HIGHLIGHT = ["#ff4d00"];
+    const HIGHLIGHT = ["#C2542E"];
 
     // Global (chamada também pelo hx-on::after-swap após add/remover série).
     window.initMuscleMap = function () {
@@ -165,14 +195,14 @@
         }).addTo(map);
 
         const route = L.geoJSON(feature, {
-            style: { color: '#d85a30', weight: 4 },
+            style: { color: '#C2542E', weight: 4 },
         }).addTo(map);
         map.fitBounds(route.getBounds(), { padding: [20, 20] });
 
-        // Marcadores de início (verde) e fim (vermelho), como no Strava.
+        // Marcadores de início (moss) e fim (brasa).
         const coords = feature.geometry.coordinates; // [lon, lat]
-        addMarker(map, coords[0], '#2e7d32', 'Início');
-        addMarker(map, coords[coords.length - 1], '#c62828', 'Fim');
+        addMarker(map, coords[0], '#5C7C66', 'Início');
+        addMarker(map, coords[coords.length - 1], '#C2542E', 'Fim');
     }
 
     function addMarker(map, lonLat, color, label) {
@@ -208,8 +238,8 @@
                 datasets: [{
                     label: 'FC',
                     data,
-                    borderColor: '#ff4d00',
-                    backgroundColor: 'rgba(255,77,0,0.08)',
+                    borderColor: '#C2542E',
+                    backgroundColor: 'rgba(194,84,46,0.10)',
                     pointRadius: 0,
                     borderWidth: 1.5,
                     tension: 0.2,
@@ -225,13 +255,14 @@
                         grid: { display: false },
                         ticks: {
                             maxTicksLimit: 6, maxRotation: 0, autoSkip: true,
-                            color: '#8a8a8e', font: { size: 10 },
+                            color: '#8B8D87', font: { size: 10 },
                             callback: (value) => clock(value),  // mostra o horário real
                         },
                     },
                     y: {
-                        title: { display: true, text: 'bpm' },
-                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        title: { display: true, text: 'bpm', color: '#8B8D87' },
+                        ticks: { color: '#8B8D87' },
+                        grid: { color: 'rgba(232,227,216,0.07)' },
                     },
                 },
                 plugins: {
