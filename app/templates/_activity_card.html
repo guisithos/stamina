@@ -1,0 +1,36 @@
+{# Card de atividade no histórico. Reusado pelo dashboard e pela página /historico.
+   Espera `a` (Activity) no contexto; usa os globais sport_icon, card_metrics, datebr. #}
+<article class="act-card" id="activity-row-{{ a.id }}">
+  <a href="/activities/{{ a.id }}" class="act-icon" aria-label="Abrir atividade">
+    <i class="ph ph-{{ sport_icon(a.sport) }}"></i>
+  </a>
+
+  <div class="act-head">
+    <div class="act-title-row">
+      <a class="act-title" href="/activities/{{ a.id }}">{{ a.label }}</a>
+      {% if a.has_gps %}
+        <span class="badge badge-gps" title="Tem GPS"><i class="ph ph-map-pin"></i> GPS</span>
+      {% endif %}
+    </div>
+    <p class="act-date mono">{{ a.start_time | datebr }}</p>
+  </div>
+
+  <div class="act-metrics">
+    {% for m in card_metrics(a) %}
+    <div class="act-metric">
+      <span class="am-label mono">{{ m.label }}</span>
+      <span class="am-value">{{ m.value }}</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <button
+    class="act-delete"
+    hx-delete="/activities/{{ a.id }}"
+    hx-target="#activity-row-{{ a.id }}"
+    hx-swap="outerHTML"
+    hx-confirm="Excluir esta atividade?"
+    title="Excluir atividade">
+    <i class="ph ph-trash"></i>
+  </button>
+</article>

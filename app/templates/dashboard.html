@@ -32,62 +32,11 @@
     </div>
   </section>
 
-  {# ---------- RESUMO DO MÊS ---------- #}
+  {# ---------- RESUMO DA SEMANA (topo) ---------- #}
   <section class="reveal" style="--delay:.15s">
-    <header class="section-head month-head">
-      <div class="month-switch">
-        <a class="month-arrow" href="/?m={{ month_prev }}" aria-label="Mês anterior"><i class="ph ph-caret-left"></i></a>
-        <h2 class="display-xl">{{ month_name }}</h2>
-        {% if month_next %}
-        <a class="month-arrow" href="/?m={{ month_next }}" aria-label="Próximo mês"><i class="ph ph-caret-right"></i></a>
-        {% else %}
-        <span class="month-arrow is-disabled" aria-hidden="true"><i class="ph ph-caret-right"></i></span>
-        {% endif %}
-      </div>
-      <span class="mono-eyebrow">{{ 'Resumo Mensal' if month_compare else 'Totais do mês' }}</span>
-    </header>
-
-    {% if month_summary %}
-    <div class="metric-grid">
-      {% for c in month_summary %}
-      <article class="metric-card {% if c.highlight %}metric-card--accent{% endif %}">
-        <div class="metric-top">
-          <span class="metric-icon"><i class="ph ph-{{ c.icon }}"></i></span>
-          {% if month_compare %}
-            {% if c.pct is none %}
-              <span class="chip chip-new"><i class="ph ph-sparkle"></i> novo</span>
-            {% elif c.pct >= 0 %}
-              <span class="chip chip-up"><i class="ph ph-trend-up"></i> {{ c.pct | round | int }}%</span>
-            {% else %}
-              <span class="chip chip-down"><i class="ph ph-trend-down"></i> {{ (c.pct | abs) | round | int }}%</span>
-            {% endif %}
-          {% endif %}
-        </div>
-        <div class="metric-value">
-          {{ c.distance if c.show_distance else c.time }}
-        </div>
-        <div class="metric-label">{{ c.label }}</div>
-        {% if c.show_distance %}
-          <div class="metric-sub mono">{{ c.time }}</div>
-        {% endif %}
-        {% if month_compare %}
-        <div class="metric-note">
-          vs. mês anterior ({{ 'distância' if c.compare == 'distance' else 'tempo' }})
-        </div>
-        {% endif %}
-      </article>
-      {% endfor %}
-    </div>
-    {% else %}
-    <p class="empty">Sem corrida, musculação, bike ou natação registradas em {{ month_name }}.</p>
-    {% endif %}
-  </section>
-
-  {# ---------- TIRA SEMANAL ---------- #}
-  <section class="reveal" style="--delay:.25s">
     <header class="section-head section-head--sm">
       <h3 class="display-md">Esta Semana</h3>
-      <span class="mono-eyebrow">7 dias</span>
+      <span class="mono-eyebrow">seg → dom</span>
     </header>
 
     <div class="week-grid">
@@ -114,59 +63,82 @@
       {% endfor %}
     </div>
 
-    <div class="week-total">
-      <span class="mono-eyebrow">Tempo total na semana</span>
-      <span class="week-total-value display-sm">{{ week_total if week_total else "—" }}</span>
+    <div class="week-summary">
+      <div class="ws-total">
+        <span class="mono-eyebrow">Tempo total na semana</span>
+        <span class="ws-total-line">
+          <span class="ws-total-value display-sm">{{ week_cmp.total_time if week_cmp.total_time else "—" }}</span>
+          {% if week_cmp.total_pct is not none %}
+          <span class="ws-delta ws-delta--{{ 'up' if week_cmp.total_pct >= 0 else 'down' }}">
+            {% if week_cmp.total_pct >= 0 %}<i class="ph ph-trend-up"></i> +{{ week_cmp.total_pct | round | int }}%
+            {% else %}<i class="ph ph-trend-down"></i> {{ week_cmp.total_pct | round | int }}%{% endif %}
+          </span>
+          <span class="ws-vs mono">vs. semana passada</span>
+          {% endif %}
+        </span>
+      </div>
+      {% if week_cmp.sports %}
+      <div class="wk-movers">
+        {% for s in week_cmp.sports %}
+        <span class="wk-mover wk-mover--{{ s.tone }}">
+          <i class="ph ph-{{ s.icon }}"></i>
+          {% if s.pct is none %}novo{% elif s.pct >= 0 %}+{{ s.pct | round | int }}%{% else %}{{ s.pct | round | int }}%{% endif %}
+        </span>
+        {% endfor %}
+      </div>
+      {% endif %}
     </div>
   </section>
 
-  {# ---------- HISTÓRICO ---------- #}
+  {# ---------- TOTAIS DO MÊS ---------- #}
+  <section class="reveal" style="--delay:.25s">
+    <header class="section-head month-head">
+      <div class="month-switch">
+        <a class="month-arrow" href="/?m={{ month_prev }}" aria-label="Mês anterior"><i class="ph ph-caret-left"></i></a>
+        <h2 class="display-xl">{{ month_name }}</h2>
+        {% if month_next %}
+        <a class="month-arrow" href="/?m={{ month_next }}" aria-label="Próximo mês"><i class="ph ph-caret-right"></i></a>
+        {% else %}
+        <span class="month-arrow is-disabled" aria-hidden="true"><i class="ph ph-caret-right"></i></span>
+        {% endif %}
+      </div>
+      <span class="mono-eyebrow">Totais do mês</span>
+    </header>
+
+    {% if month_summary %}
+    <div class="metric-grid">
+      {% for c in month_summary %}
+      <article class="metric-card {% if c.highlight %}metric-card--accent{% endif %}">
+        <div class="metric-top">
+          <span class="metric-icon"><i class="ph ph-{{ c.icon }}"></i></span>
+        </div>
+        <div class="metric-value">
+          {{ c.distance if c.show_distance else c.time }}
+        </div>
+        <div class="metric-label">{{ c.label }}</div>
+        {% if c.show_distance %}
+          <div class="metric-sub mono">{{ c.time }}</div>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">Sem corrida, musculação, bike ou natação registradas em {{ month_name }}.</p>
+    {% endif %}
+  </section>
+
+  {# ---------- HISTÓRICO (do mês selecionado) ---------- #}
   <section class="reveal" style="--delay:.35s">
     <header class="section-head section-head--sm">
       <h3 class="display-md">Histórico</h3>
-      <span class="mono-eyebrow">todas as atividades</span>
+      <a class="mono-eyebrow history-all" href="/historico">ver tudo <i class="ph ph-arrow-right"></i></a>
     </header>
 
-    {% if not activities %}
-      <p class="empty">Nenhuma atividade ainda. Envie um .fit acima pra começar.</p>
+    {% if not history %}
+      <p class="empty">Nenhuma atividade em {{ month_name }}.</p>
     {% else %}
     <div class="activity-list">
-      {% for a in activities %}
-      <article class="act-card" id="activity-row-{{ a.id }}">
-        <a href="/activities/{{ a.id }}" class="act-icon" aria-label="Abrir atividade">
-          <i class="ph ph-{{ sport_icon(a.sport) }}"></i>
-        </a>
-
-        <div class="act-head">
-          <div class="act-title-row">
-            <a class="act-title" href="/activities/{{ a.id }}">{{ a.label }}</a>
-            {% if a.has_gps %}
-              <span class="badge badge-gps" title="Tem GPS"><i class="ph ph-map-pin"></i> GPS</span>
-            {% endif %}
-          </div>
-          <p class="act-date mono">{{ a.start_time | datebr }}</p>
-        </div>
-
-        <div class="act-metrics">
-          {% for m in card_metrics(a) %}
-          <div class="act-metric">
-            <span class="am-label mono">{{ m.label }}</span>
-            <span class="am-value">{{ m.value }}</span>
-          </div>
-          {% endfor %}
-        </div>
-
-        <button
-          class="act-delete"
-          hx-delete="/activities/{{ a.id }}"
-          hx-target="#activity-row-{{ a.id }}"
-          hx-swap="outerHTML"
-          hx-confirm="Excluir esta atividade?"
-          title="Excluir atividade">
-          <i class="ph ph-trash"></i>
-        </button>
-      </article>
-      {% endfor %}
+      {% for a in history %}{% include "_activity_card.html" %}{% endfor %}
     </div>
     {% endif %}
   </section>

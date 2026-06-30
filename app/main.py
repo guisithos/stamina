@@ -8,6 +8,7 @@ from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlmodel import Session, select
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -32,10 +33,11 @@ from .summary import (
     month_name,
     month_param,
     monthly_summary,
+    month_activities,
     resolve_month,
     shift_month,
     week_days,
-    week_total_time,
+    week_summary,
 )
 
 app = FastAPI(title="Stamina")
@@ -211,23 +213,52 @@ def dashboard(request: Request, m: str = "", session: Session = Depends(get_sess
     now = datetime.now()
 
     ref = resolve_month(m, now)  # mês selecionado (dia 1), nunca além do atual
-    is_current = (ref.year, ref.month) == (now.year, now.month)
     nxt = shift_month(ref, 1)
     return templates.TemplateResponse(
         "dashboard.html",
         {
             "request": request,
             "user": user,
-            "activities": activities,
-            # comparativo % só no mês atual; meses passados mostram só os totais
-            "month_summary": monthly_summary(activities, ref, compare=is_current),
+            # mensal = só totais do mês (navegável); a comparação vive no semanal
+            "month_summary": monthly_summary(activities, ref, compare=False),
             "month_name": month_name(ref),
-            "month_compare": is_current,
             "month_prev": month_param(shift_month(ref, -1)),
             "month_next": month_param(nxt) if nxt <= date(now.year, now.month, 1) else None,
-            "week": week_days(activities, now),  # "Esta semana" é sempre a semana atual
-            "week_total": week_total_time(activities, now),
+            # semanal (topo): calendário + comparação vs semana passada
+            "week": week_days(activities, now),
+            "week_cmp": week_summary(activities, now),
+            # histórico do MÊS selecionado (acompanha a navegação acima)
+            "history": month_activities(activities, ref),
         },
+    )
+
+
+HISTORY_PAGE_SIZE = 15
+
+
+@app.get("/historico", response_class=HTMLResponse)
+def history_all(request: Request, page: int = 1, session: Session = Depends(get_session)):
+    """Histórico completo, paginado (15 por página)."""
+    user = get_current_user(request, session)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    total = session.exec(
+        select(func.count(Activity.id)).where(Activity.user_id == user.id)
+    ).one()
+    pages = max(1, (total + HISTORY_PAGE_SIZE - 1) // HISTORY_PAGE_SIZE)
+    page = min(max(1, page), pages)
+    items = session.exec(
+        select(Activity)
+        .where(Activity.user_id == user.id)
+        .order_by(Activity.start_time.desc())
+        .offset((page - 1) * HISTORY_PAGE_SIZE)
+        .limit(HISTORY_PAGE_SIZE)
+    ).all()
+    return templates.TemplateResponse(
+        "historico.html",
+        {"request": request, "user": user, "activities": items,
+         "page": page, "pages": pages, "total": total},
     )
 
 

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Histórico — Stamina{% endblock %}
+
+{% block head_extra %}
+{# reaproveita os estilos de card do dashboard (.act-card, .activity-list, .pager) #}
+<link rel="stylesheet" href="/static/dashboard.css?v=20260627">
+{% endblock %}
+
+{% block content %}
+<a href="/" class="back-link"><i class="ph ph-arrow-left"></i> voltar</a>
+<h1 class="detail-title"><i class="ph ph-clock-counter-clockwise"></i> Histórico completo</h1>
+<p class="activity-date"><i class="ph ph-list-bullets"></i> {{ total }} atividade{{ 's' if total != 1 else '' }}</p>
+
+{% if not activities %}
+  <p class="empty">Nenhuma atividade registrada ainda.</p>
+{% else %}
+<div class="activity-list" style="margin-top: 20px;">
+  {% for a in activities %}{% include "_activity_card.html" %}{% endfor %}
+</div>
+
+<nav class="pager">
+  {% if page > 1 %}
+    <a class="pager-btn" href="/historico?page={{ page - 1 }}"><i class="ph ph-caret-left"></i> Anterior</a>
+  {% else %}
+    <span class="pager-btn is-disabled"><i class="ph ph-caret-left"></i> Anterior</span>
+  {% endif %}
+  <span class="pager-info mono">página {{ page }} de {{ pages }}</span>
+  {% if page < pages %}
+    <a class="pager-btn" href="/historico?page={{ page + 1 }}">Próxima <i class="ph ph-caret-right"></i></a>
+  {% else %}
+    <span class="pager-btn is-disabled">Próxima <i class="ph ph-caret-right"></i></span>
+  {% endif %}
+</nav>
+{% endif %}
+{% endblock %}

@@ -24,17 +24,21 @@ print("status:", r.status_code)
 print("--- dashboard ---")
 r = client.get("/")
 print("status:", r.status_code)
-for label in ["Corrida (esteira)", "Musculação", "Caminhada"]:
-    print(f"  contém '{label}':", label in r.text)
+print("  layout (.dash):", 'class="dash"' in r.text)
+print("  topo = Esta Semana:", "Esta Semana" in r.text)
+print("  totais do mês presentes:", "Totais do mês" in r.text)
 
-ids = sorted(set(int(x) for x in re.findall(r"activities/(\d+)", r.text)))
-print("activity ids:", ids)
-print("  histórico em cards:", 'class="act-card"' in r.text)
-print("  mostra pace (corrida):", "/km" in r.text)
-print("  layout lovable (.dash):", 'class="dash"' in r.text)
+# IDs vêm do banco (o histórico no dashboard agora é só a semana atual)
+from sqlmodel import Session, select
+from app.database import engine
+from app.models import Activity
+with Session(engine) as _s:
+    _by_label = {a.label: a.id for a in _s.exec(select(Activity)).all()}
+caminhada_id = _by_label["Caminhada"]
+musc_id = _by_label["Musculação"]
+print("  ids por rótulo:", _by_label)
 
 print("--- detalhe da caminhada (tem gps) ---")
-caminhada_id = ids[-1]
 r = client.get(f"/activities/{caminhada_id}")
 print("status:", r.status_code)
 print('  tem div do mapa:', 'id="map"' in r.text)
@@ -45,7 +49,6 @@ print("  total de pontos no traçado:", len(coords))
 print("  primeiro ponto [lon, lat]:", coords[0])
 
 print("--- detalhe da musculação (sem gps) ---")
-musc_id = ids[0]
 r = client.get(f"/activities/{musc_id}")
 print("status:", r.status_code)
 print('  tem div do mapa:', 'id="map"' in r.text)
@@ -78,6 +81,12 @@ week = week_days(acts, ref)
 dias_com_atividade = [(d["label"], d["day"], len(d["icons"]), d["total_time"]) for d in week if d["icons"]]
 print("  dias da semana 25-31/05 (label, dia, nº ícones, tempo):", dias_com_atividade)
 print("  tempo total da semana 25-31/05:", week_total_time(acts, ref), "(esperado 54min)")
+from app.summary import week_summary, week_activities, month_activities
+print("  atividades de maio (mês):", len(month_activities(acts, _dt(2026, 5, 15))), "(esperado 2)")
+wk = week_summary(acts, _dt(2026, 5, 28))  # semana 25-31/05
+print("  semana: total", wk["total_time"], "| esportes", [(s["label"], s["tone"]) for s in wk["sports"]])
+print("  sem semana anterior -> tudo 'novo':", all(s["pct"] is None for s in wk["sports"]) and wk["total_pct"] is None)
+print("  week_activities da semana 25-31/05:", len(week_activities(acts, _dt(2026, 5, 28))), "(esperado 2)")
 
 print("--- musculação: registrar série + mapa muscular ---")
 r = client.post(f"/activities/{musc_id}/sets", data={"exercise": "supino_reto", "reps": "10", "weight": "40"})
@@ -211,6 +220,14 @@ r_past = client.get("/?m=2025-11").text
 print("  mês atual tem setas:", 'class="month-arrow"' in r_now)
 print("  navega p/ Novembro de 2025:", "Novembro de 2025" in r_past)
 print("  mês passado SEM comparativo:", "vs. mês anterior" not in r_past)
+# histórico segue o mês: navegar pra maio traz atividades de maio
+print("  histórico de maio traz 'Corrida (esteira)':", "Corrida (esteira)" in client.get("/?m=2026-05").text)
+
+print("--- histórico completo paginado (/historico) ---")
+h = client.get("/historico")
+print("  status:", h.status_code, "| tem cards:", 'class="act-card"' in h.text, "| tem paginador:", "página 1 de" in h.text)
+h999 = client.get("/historico?page=999")
+print("  page=999 é clampada (200):", h999.status_code)
 
 print("--- exclusão (htmx delete) ---")
 r = client.delete(f"/activities/{musc_id}")

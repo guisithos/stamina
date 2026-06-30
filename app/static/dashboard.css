@@ -304,19 +304,34 @@ body { font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
    TIRA SEMANAL
    ========================================================= */
 
-.week-total {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+/* resumo da semana: total + % geral + chips por esporte (vs semana passada) */
+.week-summary {
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.week-total-value {
-  font-family: var(--font-display);
-  color: var(--accent-glow);
+.ws-total { display: flex; flex-direction: column; gap: 4px; }
+.ws-total-line { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.ws-total-value { font-family: var(--font-display); color: var(--accent-glow); }
+.ws-delta { font-family: var(--font-mono); font-size: .85rem; display: inline-flex; align-items: center; gap: 4px; }
+.ws-delta--up { color: var(--up); }
+.ws-delta--down { color: var(--down); }
+.ws-vs { font-size: .72rem; color: var(--muted); }
+
+.wk-movers { display: flex; flex-wrap: wrap; gap: 8px; }
+.wk-mover {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: .78rem;
+  padding: 5px 10px; border-radius: 999px;
+  border: 1px solid var(--border-2); background: var(--surface-2, #23272B);
 }
+.wk-mover i { font-size: 1rem; }
+.wk-mover--up { color: var(--up); border-color: color-mix(in srgb, var(--up) 40%, transparent); }
+.wk-mover--down { color: var(--down); border-color: color-mix(in srgb, var(--down) 40%, transparent); }
+.wk-mover--new { color: var(--accent-glow); border-color: color-mix(in srgb, var(--accent-glow) 40%, transparent); }
 
 .week-grid {
   display: grid;
@@ -496,6 +511,23 @@ body { font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
   transition: background .2s var(--ease), color .2s var(--ease);
 }
 .act-delete:hover { background: rgba(200,90,74,.12); color: var(--danger); }
+
+/* link "ver tudo" no header do histórico */
+.history-all { text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: color .15s; }
+.history-all:hover { color: var(--accent-glow); }
+
+/* paginação (/historico) */
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+.pager-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: .8rem; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text); text-decoration: none;
+  padding: 9px 14px; border: 1px solid var(--border-2); border-radius: var(--radius);
+  transition: border-color .2s var(--ease), color .2s var(--ease);
+}
+.pager-btn:hover { border-color: var(--accent-glow); color: var(--accent-glow); }
+.pager-btn.is-disabled { opacity: .35; pointer-events: none; }
+.pager-info { color: var(--muted); font-size: .78rem; }
 
 /* =========================================================
    RESPONSIVO

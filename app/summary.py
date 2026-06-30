@@ -136,13 +136,59 @@ def monthly_summary(activities, ref_date, compare: bool = True) -> list[dict]:
     return cards
 
 
-def week_total_time(activities, ref_date) -> str:
-    """Tempo total de TODAS as atividades da semana (segunda→domingo), compacto."""
+def _week_bounds(ref_date):
     ref = _as_date(ref_date)
     monday = ref - timedelta(days=ref.weekday())
-    week_end = monday + timedelta(days=7)  # exclusivo (domingo inclusive)
+    return monday, monday + timedelta(days=7)  # [segunda, próxima segunda)
+
+
+def week_activities(activities, ref_date) -> list:
+    """Atividades da semana atual (segunda→domingo), preservando a ordem recebida."""
+    monday, week_end = _week_bounds(ref_date)
+    return [a for a in activities if monday <= a.start_time.date() < week_end]
+
+
+def month_activities(activities, ref_date) -> list:
+    """Atividades do mês de `ref_date`, preservando a ordem recebida (desc)."""
+    start, end = _month_bounds(_as_date(ref_date))
+    return [a for a in activities if start <= a.start_time.date() < end]
+
+
+def week_total_time(activities, ref_date) -> str:
+    """Tempo total de TODAS as atividades da semana (segunda→domingo), compacto."""
+    monday, week_end = _week_bounds(ref_date)
     total = sum(a.total_time_s or 0 for a in activities if monday <= a.start_time.date() < week_end)
     return _fmt_hm(total)
+
+
+def week_summary(activities, ref_date) -> dict:
+    """Resumo da semana atual com comparação vs a semana anterior:
+    tempo total + % geral, e por esporte praticado (ícone + % vs semana passada)."""
+    monday, week_end = _week_bounds(ref_date)
+    prev_start, prev_end = monday - timedelta(days=7), monday
+
+    cur_total = sum(a.total_time_s or 0 for a in activities if monday <= a.start_time.date() < week_end)
+    prev_total = sum(a.total_time_s or 0 for a in activities if prev_start <= a.start_time.date() < prev_end)
+
+    sports = []
+    for cfg in MONTH_SPORTS:
+        cur_dist, cur_secs = _totals(activities, cfg["sport"], monday, week_end)
+        if cur_dist == 0 and cur_secs == 0:
+            continue
+        prev_dist, prev_secs = _totals(activities, cfg["sport"], prev_start, prev_end)
+        pct = _pct(cur_dist, prev_dist) if cfg["compare"] == "distance" else _pct(cur_secs, prev_secs)
+        sports.append({
+            "icon": sport_icon(cfg["sport"]),
+            "label": cfg["label"],
+            "pct": pct,
+            "tone": "new" if pct is None else ("up" if pct >= 0 else "down"),
+        })
+
+    return {
+        "total_time": _fmt_hm(cur_total),
+        "total_pct": _pct(cur_total, prev_total),
+        "sports": sports,
+    }
 
 
 def week_days(activities, ref_date) -> list[dict]:
