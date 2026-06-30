@@ -1,6 +1,6 @@
-# Stamina — diário de treinos (estilo Strava, uso pessoal)
+# Stamina
 
-Backend em FastAPI + frontend server-side com Jinja2/HTMX. Importa arquivos `.fit`, guarda histórico de atividades por usuário, mostra mapa (Leaflet) pra atividades com GPS, gráfico de frequência cardíaca (Chart.js), e permite anexar foto a cada treino (upload com compressão automática, inclusive HEIF do iPhone).
+Backend em FastAPI + frontend server-side com Jinja2/HTMX. Importa arquivos `.fit`, guarda histórico de atividades por usuário, mostra mapa (Leaflet) pra atividades com GPS, gráfico de frequência cardíaca (Chart.js), e permite anexar foto a cada treino
 
 ## Rodando localmente (do zero)
 
@@ -98,7 +98,7 @@ Em vez de exportar `.fit` manualmente, dá pra receber os treinos automaticament
    (`/ingest/hae?token=...`) pra dentro do Health Auto Export.
 
 Os treinos passam a chegar sozinhos em `POST /ingest/hae` — autenticado pelo seu token,
-idempotente (não duplica em reenvios). Detalhes em `doc-interna.md` §6.9.
+idempotente (não duplica em reenvios). 
 
 ## Análise por IA (opcional, desligada por padrão)
 
