@@ -1,0 +1,19 @@
+{# Bloco da análise por IA (sob demanda). Trocado via HTMX (hx-swap=outerHTML).
+   Espera `activity` e, em erro, `ai_error`. #}
+<div id="ai-analysis" class="ai-block">
+  {% if activity.ai_analysis %}
+    <p class="ai-narrative"><i class="ph ph-robot"></i> {{ activity.ai_analysis }}</p>
+    <form hx-post="/activities/{{ activity.id }}/analyze?force=1"
+          hx-target="#ai-analysis" hx-swap="outerHTML" hx-indicator="#ai-spin">
+      <button type="submit" class="ai-regen"><i class="ph ph-arrows-clockwise"></i> regerar</button>
+      <span id="ai-spin" class="ai-spin htmx-indicator">analisando…</span>
+    </form>
+  {% else %}
+    {% if ai_error %}<p class="hint"><i class="ph ph-warning-circle"></i> Não foi possível gerar a análise agora. Tente de novo.</p>{% endif %}
+    <form hx-post="/activities/{{ activity.id }}/analyze"
+          hx-target="#ai-analysis" hx-swap="outerHTML" hx-indicator="#ai-spin">
+      <button type="submit" class="ai-btn"><i class="ph ph-sparkle"></i> Analisar com IA</button>
+      <span id="ai-spin" class="ai-spin htmx-indicator">analisando…</span>
+    </form>
+  {% endif %}
+</div>

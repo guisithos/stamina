@@ -1,6 +1,6 @@
 # Stamina — diário de treinos (estilo Strava, uso pessoal)
 
-Backend em FastAPI + frontend server-side com Jinja2/HTMX. Importa arquivos `.fit`, guarda histórico de atividades por usuário, mostra mapa (Leaflet) pra atividades com GPS e gráfico de frequência cardíaca (Chart.js).
+Backend em FastAPI + frontend server-side com Jinja2/HTMX. Importa arquivos `.fit`, guarda histórico de atividades por usuário, mostra mapa (Leaflet) pra atividades com GPS, gráfico de frequência cardíaca (Chart.js), e permite anexar foto a cada treino (upload com compressão automática, inclusive HEIF do iPhone).
 
 ## Rodando localmente (do zero)
 
@@ -99,6 +99,39 @@ Em vez de exportar `.fit` manualmente, dá pra receber os treinos automaticament
 
 Os treinos passam a chegar sozinhos em `POST /ingest/hae` — autenticado pelo seu token,
 idempotente (não duplica em reenvios). Detalhes em `doc-interna.md` §6.9.
+
+## Análise por IA (opcional, desligada por padrão)
+
+Na página de uma corrida, um botão "Analisar com IA" gera uma leitura comparativa
+(últimas 8 corridas + a atual: EF, desacoplamento, pace×FC, volume, RPE). A IA só
+**fraseia** os números que o `analysis.py` calcula — não vê dado cru nem inventa.
+
+É **provider-agnostic** (protocolo OpenAI-compatible) — funciona com DeepSeek,
+OpenRouter, OpenAI, etc. Fica desligada até você configurar:
+
+```
+fly secrets set AI_ENABLED=true \
+  AI_BASE_URL=https://api.deepseek.com \
+  AI_API_KEY=<sua-chave> \
+  AI_MODEL=deepseek-chat
+```
+
+Para um gateway (ex.: OpenRouter alcançando Claude Haiku), troque `AI_BASE_URL` e
+`AI_MODEL`. Sem essas vars, o botão não aparece. A narrativa é gerada sob demanda e
+cacheada por treino (não chama o provedor a cada acesso).
+
+## Foto do treino
+
+Na página de cada atividade, há um ícone de câmera ao lado do título. Ao selecionar
+uma foto, ela é enviada automaticamente:
+
+- **Formatos suportados:** JPEG, PNG e **HEIF/HEIC** (fotos de iPhone).
+- **Processamento automático:** redimensiona (max 1920px), comprime (JPEG quality 75).
+  Uma foto de ~10 MB do iPhone vira ~200-400 KB.
+- **Exibição:** entre o grid de estatísticas e o registro de RPE/nota.
+- **Remoção:** botão de lixeira sobre a foto (com confirmação).
+- **Armazenamento:** as fotos ficam em `photos/` (local) ou `/data/photos/` (volume
+  persistente no Fly), mesmo diretório do banco.
 
 ## Decisões da v0 (e o que evolui depois)
 

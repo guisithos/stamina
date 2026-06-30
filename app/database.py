@@ -35,6 +35,12 @@ def run_light_migrations() -> None:
             conn.exec_driver_sql("ALTER TABLE activity ADD COLUMN rpe INTEGER")
         if "note" not in act_cols:
             conn.exec_driver_sql("ALTER TABLE activity ADD COLUMN note VARCHAR")
+        if "ai_analysis" not in act_cols:
+            conn.exec_driver_sql("ALTER TABLE activity ADD COLUMN ai_analysis VARCHAR")
+        if "ai_analysis_at" not in act_cols:
+            conn.exec_driver_sql("ALTER TABLE activity ADD COLUMN ai_analysis_at TIMESTAMP")
+        if "photo_filename" not in act_cols:
+            conn.exec_driver_sql("ALTER TABLE activity ADD COLUMN photo_filename VARCHAR")
 
         user_cols = {r[1] for r in conn.exec_driver_sql('PRAGMA table_info("user")').fetchall()}
         if "ingest_token" not in user_cols:

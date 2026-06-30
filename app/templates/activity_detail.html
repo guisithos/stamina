@@ -3,7 +3,20 @@
 
 {% block content %}
 <a href="/" class="back-link"><i class="ph ph-arrow-left"></i> voltar</a>
-<h1 class="detail-title"><i class="ph ph-{{ sport_icon(activity.sport) }}"></i> {{ activity.label }}</h1>
+<h1 class="detail-title">
+    <span class="detail-title-text"><i class="ph ph-{{ sport_icon(activity.sport) }}"></i> {{ activity.label }}</span>
+    <form class="photo-upload-form"
+          hx-post="/activities/{{ activity.id }}/photo"
+          hx-target="#photo-section"
+          hx-swap="innerHTML"
+          hx-encoding="multipart/form-data"
+          hx-trigger="change from:input[type=file]">
+        <label class="photo-upload-btn" title="{% if activity.photo_filename %}Trocar foto{% else %}Adicionar foto do treino{% endif %}">
+            <i class="ph ph-camera"></i>
+            <input type="file" name="photo" accept="image/*" hidden>
+        </label>
+    </form>
+</h1>
 <p class="activity-date"><i class="ph ph-calendar-blank"></i> {{ activity.start_time | datebr }}</p>
 
 <div class="stats-grid">
@@ -24,6 +37,10 @@
     <div class="stat"><span class="stat-label">Perda de elevação</span><span class="stat-value">{{ activity.total_descent_m }} m</span></div>
     {% endif %}
 </div>
+
+<section id="photo-section">
+    {% include "_activity_photo.html" %}
+</section>
 
 {% if analysis %}
 <section class="analysis">
@@ -52,6 +69,8 @@
     {% if analysis.baseline_n %}
     <p class="hint">Comparado com suas {{ analysis.baseline_n }} corridas anteriores · EF = velocidade ÷ FC média.</p>
     {% endif %}
+
+    {% if ai_enabled %}{% include "_ai_analysis.html" %}{% endif %}
 </section>
 {% endif %}
 

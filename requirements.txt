@@ -7,3 +7,5 @@ bcrypt==4.2.0
 itsdangerous==2.2.0
 fitparse==1.2.0
 httpx==0.28.1
+pillow>=11.1.0
+pillow-heif>=0.21.0

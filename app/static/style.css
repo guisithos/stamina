@@ -140,8 +140,47 @@ button:active { transform: scale(0.98); }
 .back-link { display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted); text-decoration: none; font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
 .back-link:hover { color: var(--accent-glow); }
 .detail-title { display: flex; align-items: center; gap: 12px; }
+.detail-title-text { display: flex; align-items: center; gap: 12px; }
 .detail-title .ph { color: var(--accent-glow); font-size: 1.6rem; }
 .activity-date { display: flex; align-items: center; gap: 6px; color: var(--text-muted); margin: 0; font-family: var(--font-mono); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.1em; }
+
+/* ---------- foto do treino ---------- */
+.photo-upload-form { margin-left: auto; display: flex; flex-shrink: 0; }
+.photo-upload-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: transparent;
+    border: 1px dashed var(--border-2);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: all 0.2s var(--ease);
+}
+.photo-upload-btn:hover { border-color: var(--accent-glow); color: var(--accent-glow); background: var(--accent-soft); }
+
+#photo-section { margin-top: 24px; }
+.activity-photo {
+    position: relative;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+.activity-photo img {
+    display: block; width: 100%; height: auto;
+    max-height: 480px; object-fit: cover;
+}
+.photo-delete-btn {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(0,0,0,0.55); color: #fff;
+    border: none; border-radius: 50%;
+    width: 32px; height: 32px; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; font-size: 0.85rem;
+    transition: background 0.15s;
+    backdrop-filter: blur(4px);
+}
+.photo-delete-btn:hover { background: var(--danger); }
 
 .stats-grid {
     display: grid;
@@ -194,6 +233,18 @@ button:active { transform: scale(0.98); }
 .adelta--good .ad-delta, .analysis-note.adelta--good { color: var(--up); }
 .adelta--bad .ad-delta, .analysis-note.adelta--bad { color: var(--down); }
 .adelta--neutral .ad-delta, .analysis-note.adelta--neutral { color: var(--text-muted); }
+
+/* análise por IA (sob demanda) */
+.ai-block { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border-2); }
+.ai-narrative { margin: 0; font-size: 0.98rem; line-height: 1.55; color: var(--text); display: flex; gap: 8px; }
+.ai-narrative .ph { color: var(--accent-glow); font-size: 1.1rem; flex-shrink: 0; margin-top: 2px; }
+.ai-btn { background: var(--accent-soft); color: var(--accent-glow); border: 1px solid color-mix(in srgb, var(--accent-glow) 35%, transparent); }
+.ai-btn:hover { background: var(--accent-glow); color: var(--bg); }
+.ai-regen { margin-top: 10px; background: transparent; color: var(--text-muted); border: 1px solid var(--border-2); font-size: 0.78rem; padding: 6px 12px; }
+.ai-regen:hover { color: var(--accent-glow); border-color: var(--accent-glow); background: transparent; }
+.ai-spin { margin-left: 10px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted); }
+.htmx-indicator { opacity: 0; transition: opacity .2s; }
+.htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; }
 
 .hint { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 0.85rem; margin-top: 14px; }
 .hint .ph { color: var(--accent-glow); }

@@ -119,6 +119,46 @@ def _decoupling_view(decoup: dict) -> dict:
             "tone": "bad", "icon": "warning"}
 
 
+def _avg_cadence(points) -> Optional[int]:
+    vals = [p["cadence"] for p in points if p.get("cadence")]
+    return round(mean(vals)) if vals else None
+
+
+def run_metrics(activity, *, full: bool = False) -> dict:
+    """Métricas de UMA corrida. `full=True` (a atual) inclui desacoplamento e
+    cadência (mais pesado: parseia os track_points); as anteriores vão resumidas."""
+    dist, time_s, hr = activity.distance_m, activity.total_time_s, activity.avg_hr
+    ef = efficiency_factor(dist, time_s, hr)
+    m = {
+        "data": activity.start_time.strftime("%Y-%m-%d"),
+        "distancia_km": round(dist / 1000, 2) if dist else None,
+        "duracao_min": round(time_s / 60, 1) if time_s else None,
+        "pace": format_pace(time_s, dist) if (time_s and dist) else None,
+        "fc_media": hr,
+        "fc_max": activity.max_hr,
+        "ef": round(ef, 3) if ef else None,
+        "rpe": activity.rpe,
+        "ganho_elevacao_m": round(activity.total_ascent_m) if activity.total_ascent_m else None,
+        "calorias": activity.calories,
+    }
+    if full:
+        points = json.loads(activity.track_points_json) if activity.track_points_json else []
+        decoup = aerobic_decoupling(points, time_s)
+        m["desacoplamento_pct"] = decoup["value"] if decoup else None
+        m["desacoplamento_tipo"] = decoup["kind"] if decoup else None
+        m["cadencia_media"] = _avg_cadence(points)
+    return m
+
+
+def build_run_dataset(activity, previous_runs: list) -> dict:
+    """Dataset pra IA: a corrida atual (completa) + as últimas N anteriores (resumidas),
+    da mais recente pra mais antiga. É a base do comparativo."""
+    return {
+        "atual": run_metrics(activity, full=True),
+        "anteriores": [run_metrics(r) for r in previous_runs],
+    }
+
+
 def build_run_analysis(activity, previous_runs: list) -> Optional[dict]:
     """Monta a análise da corrida vs as últimas N corridas (já filtradas)."""
     dist, time_s, hr = activity.distance_m, activity.total_time_s, activity.avg_hr

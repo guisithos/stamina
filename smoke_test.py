@@ -204,15 +204,38 @@ _p = parse_hae_workout(_wk)
 print(f"  duration HAE=610s -> total_time_s (movimento)={_p['total_time_s']}s (esperado ~400, < 610)")
 print("  sport:", _p["sport"], "(esperado running)")
 
-print("--- análise (só na corrida mais recente) ---")
+print("--- análise (em toda corrida) ---")
 with Session(engine) as s:
     run_latest = s.exec(select(Activity).where(Activity.external_id == "HAE-ABC-123")).first().id
     esteira_id = s.exec(select(Activity).where(Activity.label == "Corrida (esteira)")).first().id
 det_latest = client.get(f"/activities/{run_latest}").text
 det_old = client.get(f"/activities/{esteira_id}").text
-print("  última corrida tem análise:", 'class="analysis"' in det_latest)
+print("  corrida recente tem análise:", 'class="analysis"' in det_latest)
 print("  tem frase comparativa:", "vs suas últimas" in det_latest)
-print("  corrida antiga NÃO tem análise:", 'class="analysis"' not in det_old)
+print("  corrida antiga TAMBÉM tem análise:", 'class="analysis"' in det_old)
+
+print("--- análise por IA (mockada, sob demanda) ---")
+import os as _os
+import app.ai as _ai
+from app.analysis import build_run_dataset as _bds
+_os.environ["AI_ENABLED"] = "true"; _os.environ["AI_API_KEY"] = "fake-key"
+# dataset: atual completo (com desacoplamento) + anteriores
+with Session(engine) as s:
+    _run = s.get(Activity, run_latest)
+    _prev = s.exec(select(Activity).where(Activity.sport == "running",
+                   Activity.start_time < _run.start_time)).all()
+_ds = _bds(_run, list(_prev))
+print("  dataset tem 'atual' e 'anteriores':", "atual" in _ds and "anteriores" in _ds)
+print("  atual tem EF e desacoplamento:", "ef" in _ds["atual"] and "desacoplamento_pct" in _ds["atual"])
+_ai.generate_run_narrative = lambda dataset: "Análise IA fake: EF estável, bom desacoplamento."
+r = client.post(f"/activities/{run_latest}/analyze")
+print("  analyze status:", r.status_code, "| tem narrativa:", "Análise IA fake" in r.text)
+_ai.generate_run_narrative = lambda dataset: "NÃO DEVERIA REGERAR"
+r2 = client.post(f"/activities/{run_latest}/analyze")
+print("  cacheado (não chamou de novo):", "Análise IA fake" in r2.text and "REGERAR" not in r2.text)
+print("  force=1 regenera:", "REGERAR" in client.post(f"/activities/{run_latest}/analyze?force=1").text)
+_os.environ["AI_ENABLED"] = "false"
+print("  desligado -> 403:", client.post(f"/activities/{run_latest}/analyze").status_code == 403)
 
 print("--- navegação de mês ---")
 r_now = client.get("/").text

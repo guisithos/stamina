@@ -54,6 +54,15 @@ class Activity(SQLModel, table=True):
     rpe: Optional[int] = None      # esforço percebido (0–10); RIR ≈ 10 - rpe
     note: Optional[str] = None     # nota livre: como foi, o que foi feito
 
+    # Análise gerada por IA (sob demanda) + quando foi gerada. Cache: não
+    # chamamos o provedor a cada page-load, só quando o usuário pede/regerar.
+    ai_analysis: Optional[str] = None
+    ai_analysis_at: Optional[datetime] = None
+
+    # Foto do treino (upload via detail). Armazenamos só o nome do arquivo;
+    # o arquivo em si fica em PHOTOS_DIR (/data/photos/ no Fly, photos/ local).
+    photo_filename: Optional[str] = None
+
     raw_filename: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 

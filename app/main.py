@@ -14,7 +14,8 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from .auth import get_current_user, get_user_by_email, hash_password, verify_password
 from .database import create_db_and_tables, engine, get_session, run_light_migrations
-from .analysis import build_run_analysis
+from . import ai
+from .analysis import build_run_analysis, build_run_dataset
 from .fit_parser import friendly_sport, parse_fit
 from .geo import track_to_geojson
 from .hae_parser import parse_hae_workout, resolve_sport
@@ -28,6 +29,7 @@ from .metrics import (
     sport_icon,
 )
 from .models import Activity, StrengthSet, User
+from .photos import PHOTOS_DIR, MAX_PHOTO_BYTES, delete_photo as delete_photo_file, save_photo
 from .strength import EXERCISE_GROUPS, EXERCISES, exercise_label, muscles_for
 from .summary import (
     month_name,
@@ -84,6 +86,10 @@ async def security_headers(request: Request, call_next):
 
 BASE_DIR = os.path.dirname(__file__)
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+
+os.makedirs(PHOTOS_DIR, exist_ok=True)
+app.mount("/photos", StaticFiles(directory=PHOTOS_DIR), name="photos")
+
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 
@@ -397,22 +403,55 @@ def activity_detail(
     if activity.sport == "training":  # musculação ganha o registro de séries + mapa muscular
         context.update(_strength_context(activity, session))
     elif activity.sport == "running":
-        # Análise comparativa só na corrida MAIS RECENTE (por ora).
-        latest_run = session.exec(
+        # Análise comparativa em QUALQUER corrida (esteira ou rua), comparando
+        # com as 5 corridas anteriores a ela.
+        previous = session.exec(
             select(Activity)
-            .where(Activity.user_id == user.id, Activity.sport == "running")
+            .where(Activity.user_id == user.id, Activity.sport == "running",
+                   Activity.start_time < activity.start_time)
             .order_by(Activity.start_time.desc())
-        ).first()
-        if latest_run and latest_run.id == activity.id:
-            previous = session.exec(
-                select(Activity)
-                .where(Activity.user_id == user.id, Activity.sport == "running",
-                       Activity.start_time < activity.start_time)
-                .order_by(Activity.start_time.desc())
-                .limit(5)
-            ).all()
-            context["analysis"] = build_run_analysis(activity, list(previous))
+            .limit(5)
+        ).all()
+        context["analysis"] = build_run_analysis(activity, list(previous))
+        context["ai_enabled"] = ai.is_enabled()  # mostra (ou não) o botão de IA
     return templates.TemplateResponse("activity_detail.html", context)
+
+
+@app.post("/activities/{activity_id}/analyze", response_class=HTMLResponse)
+def analyze_activity(
+    request: Request, activity_id: int, force: int = 0,
+    session: Session = Depends(get_session),
+):
+    """Gera (ou devolve do cache) a análise por IA da corrida. Sob demanda."""
+    user = get_current_user(request, session)
+    if not user:
+        return HTMLResponse(status_code=401)
+    activity = session.get(Activity, activity_id)
+    if not activity or activity.user_id != user.id or activity.sport != "running":
+        return HTMLResponse(status_code=404)
+    if not ai.is_enabled():
+        return HTMLResponse(status_code=403)
+
+    ctx = {"request": request, "activity": activity}
+    if activity.ai_analysis and not force:
+        return templates.TemplateResponse("_ai_analysis.html", ctx)  # cache
+
+    previous = session.exec(
+        select(Activity)
+        .where(Activity.user_id == user.id, Activity.sport == "running",
+               Activity.start_time < activity.start_time)
+        .order_by(Activity.start_time.desc())
+        .limit(8)  # últimas 8 corridas pro comparativo
+    ).all()
+    text = ai.generate_run_narrative(build_run_dataset(activity, list(previous)))
+    if text:
+        activity.ai_analysis = text
+        activity.ai_analysis_at = datetime.utcnow()
+        session.add(activity)
+        session.commit()
+    else:
+        ctx["ai_error"] = True
+    return templates.TemplateResponse("_ai_analysis.html", ctx)
 
 
 def _strength_context(activity: Activity, session: Session) -> dict:
@@ -558,6 +597,63 @@ def edit_note(
     session.add(activity)
     session.commit()
     return RedirectResponse(url=f"/activities/{activity_id}", status_code=303)
+
+
+@app.post("/activities/{activity_id}/photo", response_class=HTMLResponse)
+async def upload_photo(
+    request: Request,
+    activity_id: int,
+    photo: UploadFile = File(...),
+    session: Session = Depends(get_session),
+):
+    """Upload da foto do treino. Processa (redimensiona/comprime) e retorna o partial."""
+    user = get_current_user(request, session)
+    if not user:
+        return HTMLResponse(status_code=401)
+    activity = session.get(Activity, activity_id)
+    if not activity or activity.user_id != user.id:
+        return HTMLResponse(status_code=404)
+
+    raw = await photo.read()
+    if len(raw) > MAX_PHOTO_BYTES:
+        return HTMLResponse("<p class=\"hint\">Arquivo grande demais (máx 20 MB).</p>", status_code=413)
+
+    try:
+        filename = save_photo(raw, activity.id)
+    except ValueError as e:
+        return HTMLResponse(f"<p class=\"hint\">{e}</p>", status_code=400)
+
+    # Remove foto anterior se existir
+    if activity.photo_filename:
+        delete_photo_file(activity.photo_filename)
+
+    activity.photo_filename = filename
+    session.add(activity)
+    session.commit()
+
+    ctx = {"request": request, "activity": activity}
+    return templates.TemplateResponse("_activity_photo.html", ctx)
+
+
+@app.delete("/activities/{activity_id}/photo", response_class=HTMLResponse)
+def remove_photo(
+    request: Request, activity_id: int, session: Session = Depends(get_session)
+):
+    """Remove a foto do treino (arquivo + referência no banco)."""
+    user = get_current_user(request, session)
+    if not user:
+        return HTMLResponse(status_code=401)
+    activity = session.get(Activity, activity_id)
+    if not activity or activity.user_id != user.id:
+        return HTMLResponse(status_code=404)
+
+    if activity.photo_filename:
+        delete_photo_file(activity.photo_filename)
+        activity.photo_filename = None
+        session.add(activity)
+        session.commit()
+
+    return HTMLResponse("")  # HTMX: esvazia #photo-section
 
 
 @app.post("/activities/{activity_id}/distance")

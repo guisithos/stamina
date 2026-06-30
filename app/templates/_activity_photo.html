@@ -1,0 +1,15 @@
+{# Partial da foto do treino. Renderizado no detalhe e nas respostas HTMX
+   de upload/exclusão de foto (que trocam o innerHTML de #photo-section). #}
+{% if activity.photo_filename %}
+<div class="activity-photo">
+  <img src="/photos/{{ activity.photo_filename }}" alt="Foto do treino">
+  <button class="photo-delete-btn"
+          hx-delete="/activities/{{ activity.id }}/photo"
+          hx-target="#photo-section"
+          hx-swap="innerHTML"
+          hx-confirm="Remover esta foto?"
+          title="Remover foto">
+    <i class="ph ph-trash"></i>
+  </button>
+</div>
+{% endif %}
