@@ -160,18 +160,29 @@ button:active { transform: scale(0.98); }
 
 #photo-section { margin-top: 24px; }
 .activity-photo {
-    position: relative;
-    border-radius: var(--radius);
-    overflow: hidden;
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow);
+    display: flex;
+    justify-content: center;
 }
-.activity-photo img {
-    display: block; width: 100%; height: auto;
-    max-height: 480px; object-fit: cover;
+.photo-frame {
+    max-width: 580px;
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    padding: 14px;
+    position: relative;
+}
+.photo-frame img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 70vh;
+    object-fit: contain;
+    border-radius: 5px;
 }
 .photo-delete-btn {
-    position: absolute; top: 12px; right: 12px;
+    position: absolute; top: 22px; right: 22px;
     background: rgba(0,0,0,0.55); color: #fff;
     border: none; border-radius: 50%;
     width: 32px; height: 32px; padding: 0;
