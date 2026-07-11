@@ -1,0 +1,188 @@
+/* =========================================================
+   Perfil — avatar, resumo de 3 meses e heatmap anual.
+   Reusa tokens/componentes de dashboard.css (metric cards,
+   reveal, tipografia). Só o que é específico do perfil vive aqui.
+   ========================================================= */
+
+/* o perfil precisa de mais largura que as páginas centradas (820px)
+   por causa do heatmap; libera até ~960px. */
+main:has(.profile) { max-width: none; padding: 0; }
+
+.profile {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+/* ---------- cabeçalho ---------- */
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.profile-id { min-width: 0; }
+.profile-name { margin: 0; overflow-wrap: anywhere; }
+.profile-email { margin: 6px 0 0; color: var(--muted); font-size: .85rem; }
+.profile-stats {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: .92rem;
+  color: var(--fg-soft);
+}
+.profile-stats strong { font-family: var(--font-display); color: var(--fg); font-size: 1.1rem; }
+.profile-stats .dot { color: var(--muted); }
+
+/* ---------- avatar ---------- */
+.avatar {
+  --size: 116px;
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.avatar--empty {
+  background: var(--ember);
+  border-color: #6E1A14;
+}
+.avatar-initial {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 3rem;
+  color: var(--fg);
+  text-transform: uppercase;
+}
+
+/* botão de câmera sobreposto (canto inferior direito) */
+.avatar-upload {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(21,23,26,.72);
+  border: 1px solid var(--border-2);
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 1rem;
+  backdrop-filter: blur(4px);
+  transition: background .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease);
+}
+.avatar-upload:hover { background: var(--ember); border-color: #6E1A14; color: var(--fg); }
+.avatar-upload input[type="file"] { display: none; }
+
+.avatar-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0,0,0,.55);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: .8rem;
+  backdrop-filter: blur(4px);
+  transition: background .15s;
+}
+.avatar-del:hover { background: var(--danger); }
+
+/* enquanto o upload roda, um leve pulse pra dar feedback */
+.avatar.htmx-request { opacity: .6; transition: opacity .15s; }
+
+/* =========================================================
+   HEATMAP anual (quadradinhos por dia)
+   ========================================================= */
+.heatmap-scroll {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.heatmap {
+  --hm-cell: 13px;
+  --hm-gap: 3px;
+  display: inline-block;
+  min-width: min-content;
+}
+.hm-months {
+  display: flex;
+  gap: var(--hm-gap);
+  margin-bottom: 6px;
+}
+.hm-month {
+  width: var(--hm-cell);
+  font-family: var(--font-mono);
+  font-size: .6rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: visible;
+}
+.hm-grid {
+  display: flex;
+  gap: var(--hm-gap);
+}
+.hm-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hm-gap);
+}
+.hm-cell {
+  width: var(--hm-cell);
+  height: var(--hm-cell);
+  border-radius: 3px;
+  background: var(--hm-l0-bg);
+}
+
+/* escala de intensidade (brasa): 0 = vazio, 4 = brasa acesa */
+.heatmap, .hm-legend {
+  --hm-l0-bg: #22262A;
+}
+.hm-l0 { background: var(--hm-l0-bg); border: 1px solid rgba(255,255,255,.02); }
+.hm-l1 { background: rgba(194,84,46,.28); }
+.hm-l2 { background: rgba(194,84,46,.52); }
+.hm-l3 { background: rgba(194,84,46,.76); }
+.hm-l4 { background: var(--accent-glow); }
+.hm-cell.is-future { background: transparent; border: 1px dashed var(--border); }
+
+.hm-legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  font-size: .68rem;
+  color: var(--muted);
+}
+.hm-legend .hm-cell { width: 12px; height: 12px; }
+.hm-legend .mono { letter-spacing: .1em; }
+
+@media (max-width: 640px) {
+  .profile { padding: 20px 16px 60px; gap: 36px; }
+  .avatar { --size: 92px; }
+}

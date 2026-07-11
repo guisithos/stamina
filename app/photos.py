@@ -62,6 +62,18 @@ def save_photo(raw: bytes, activity_id: int) -> str:
     return filename
 
 
+def save_avatar(raw: bytes, user_id: int) -> str:
+    """Salva a foto de perfil processada e retorna o nome do arquivo.
+    Mesmo pipeline das fotos de treino (resize/compress), prefixo distinto."""
+    ensure_photos_dir()
+    filename = f"avatar_{user_id}_{uuid.uuid4().hex[:8]}.jpg"
+    filepath = os.path.join(PHOTOS_DIR, filename)
+    processed = process_photo(raw)
+    with open(filepath, "wb") as f:
+        f.write(processed)
+    return filename
+
+
 def delete_photo(filename: str):
     """Remove o arquivo de foto do disco, se existir."""
     filepath = os.path.join(PHOTOS_DIR, filename)

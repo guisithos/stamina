@@ -1,0 +1,28 @@
+{# Avatar do perfil. Renderizado na página de perfil e nas respostas HTMX de
+   upload/remover foto (trocam o innerHTML de #avatar-block). #}
+<div class="avatar {% if not user.avatar_filename %}avatar--empty{% endif %}">
+  {% if user.avatar_filename %}
+    <img src="/photos/{{ user.avatar_filename }}" alt="Foto de {{ username }}">
+    <button class="avatar-del"
+            hx-delete="/perfil/foto"
+            hx-target="#avatar-block"
+            hx-swap="innerHTML"
+            hx-confirm="Remover a foto de perfil?"
+            title="Remover foto">
+      <i class="ph ph-trash"></i>
+    </button>
+  {% else %}
+    <span class="avatar-initial">{{ username[0] | upper }}</span>
+  {% endif %}
+
+  {# botão de upload sobreposto — troca a foto a qualquer momento #}
+  <label class="avatar-upload" title="{{ 'Trocar' if user.avatar_filename else 'Adicionar' }} foto">
+    <i class="ph ph-camera"></i>
+    <input type="file" name="avatar" accept="image/*"
+           hx-post="/perfil/foto"
+           hx-target="#avatar-block"
+           hx-swap="innerHTML"
+           hx-encoding="multipart/form-data"
+           hx-trigger="change">
+  </label>
+</div>

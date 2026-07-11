@@ -77,7 +77,9 @@ main:has(.dash) { max-width: none; padding: 0; }
 .brand .ph { color: var(--accent-glow); font-size: 1.25rem; }
 .nav-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-family: var(--font-mono); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; transition: color 0.15s; }
 .nav-link:hover { color: var(--accent-glow); }
-.nav-user { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); margin-left: auto; font-family: var(--font-mono); font-size: 0.78rem; }
+.nav-user { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); margin-left: auto; font-family: var(--font-mono); font-size: 0.78rem; text-decoration: none; transition: color 0.15s; }
+.nav-user:hover { color: var(--accent-glow); }
+.nav-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; border: 1px solid var(--border-2); }
 .nav-logout { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); text-decoration: none; font-family: var(--font-mono); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; transition: color 0.15s; }
 .nav-logout:hover { color: var(--accent-glow); }
 

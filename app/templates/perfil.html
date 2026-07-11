@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Perfil · Stamina{% endblock %}
+
+{% block head_extra %}
+{# reusa os componentes do dashboard (metric cards, reveal, tipografia) #}
+<link rel="stylesheet" href="/static/dashboard.css?v=20260627">
+<link rel="stylesheet" href="/static/perfil.css?v=20260710">
+{% endblock %}
+
+{% block content %}
+<div class="profile">
+
+  {# ---------- CABEÇALHO: avatar + identidade ---------- #}
+  <section class="reveal profile-head" style="--delay:.05s">
+    <div id="avatar-block">{% include "_avatar.html" %}</div>
+    <div class="profile-id">
+      <h1 class="profile-name display-xl">{{ username }}</h1>
+      <p class="profile-email mono">{{ user.email }}</p>
+      <div class="profile-stats">
+        <span><strong>{{ totals.total_count }}</strong> atividades</span>
+        <span class="dot">·</span>
+        <span><strong>{{ heatmap.active_days }}</strong> dias ativos no ano</span>
+      </div>
+    </div>
+  </section>
+
+  {# ---------- TOTAIS DOS ÚLTIMOS 3 MESES ---------- #}
+  <section class="reveal" style="--delay:.15s">
+    <header class="section-head section-head--sm">
+      <h3 class="display-md">Últimos 3 meses</h3>
+      <span class="mono-eyebrow">{{ totals.total_time }} no total</span>
+    </header>
+
+    {% if totals.cards %}
+    <div class="metric-grid">
+      {% for c in totals.cards %}
+      <article class="metric-card">
+        <div class="metric-top">
+          <span class="metric-icon"><i class="ph ph-{{ c.icon }}"></i></span>
+        </div>
+        <div class="metric-value">{{ c.count }}</div>
+        <div class="metric-label">{{ c.label }}</div>
+        <div class="metric-sub mono">
+          {{ c.time }}{% if c.show_distance %} · {{ c.distance }}{% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">Nenhuma atividade registrada nos últimos 3 meses.</p>
+    {% endif %}
+  </section>
+
+  {# ---------- HEATMAP ANUAL ("quadradinhos" estilo GitHub) ---------- #}
+  <section class="reveal" style="--delay:.25s">
+    <header class="section-head section-head--sm">
+      <h3 class="display-md">Atividade no ano</h3>
+      <span class="mono-eyebrow">{{ heatmap.total }} registros</span>
+    </header>
+
+    <div class="heatmap-scroll">
+      <div class="heatmap">
+        <div class="hm-months">
+          {% for m in heatmap.months %}<span class="hm-month">{{ m }}</span>{% endfor %}
+        </div>
+        <div class="hm-grid">
+          {% for week in heatmap.weeks %}
+          <div class="hm-col">
+            {% for d in week %}
+            <span class="hm-cell hm-l{{ d.level }} {% if d.is_future %}is-future{% endif %}"
+                  title="{% if d.count %}{{ d.count }} atividade{{ 's' if d.count > 1 else '' }} em {% endif %}{{ d.iso }}"></span>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="hm-legend">
+      <span class="mono">menos</span>
+      <span class="hm-cell hm-l0"></span>
+      <span class="hm-cell hm-l1"></span>
+      <span class="hm-cell hm-l2"></span>
+      <span class="hm-cell hm-l3"></span>
+      <span class="hm-cell hm-l4"></span>
+      <span class="mono">mais</span>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

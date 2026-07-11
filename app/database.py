@@ -45,6 +45,8 @@ def run_light_migrations() -> None:
         user_cols = {r[1] for r in conn.exec_driver_sql('PRAGMA table_info("user")').fetchall()}
         if "ingest_token" not in user_cols:
             conn.exec_driver_sql('ALTER TABLE "user" ADD COLUMN ingest_token VARCHAR')
+        if "avatar_filename" not in user_cols:
+            conn.exec_driver_sql('ALTER TABLE "user" ADD COLUMN avatar_filename VARCHAR')
 
         rows = conn.exec_driver_sql('SELECT id FROM "user" WHERE ingest_token IS NULL').fetchall()
         for (uid,) in rows:

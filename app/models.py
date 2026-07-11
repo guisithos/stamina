@@ -11,6 +11,9 @@ class User(SQLModel, table=True):
     # token usado pela ingestão automática (Health Auto Export) p/ identificar o
     # usuário sem cookie de sessão. Gerado no cadastro; revogável (regenerável).
     ingest_token: Optional[str] = Field(default=None, index=True)
+    # Foto de perfil (upload via /perfil). Só o nome do arquivo; o arquivo mora
+    # em PHOTOS_DIR, junto das fotos de treino (avatar_{user_id}_{hash}.jpg).
+    avatar_filename: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 

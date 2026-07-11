@@ -29,7 +29,14 @@ from .metrics import (
     sport_icon,
 )
 from .models import Activity, StrengthSet, User
-from .photos import PHOTOS_DIR, MAX_PHOTO_BYTES, delete_photo as delete_photo_file, save_photo
+from .photos import (
+    PHOTOS_DIR,
+    MAX_PHOTO_BYTES,
+    delete_photo as delete_photo_file,
+    save_avatar,
+    save_photo,
+)
+from .profile import activity_heatmap, three_month_totals, username_from_email
 from .strength import EXERCISE_GROUPS, EXERCISES, exercise_label, muscles_for
 from .summary import (
     month_name,
@@ -266,6 +273,77 @@ def history_all(request: Request, page: int = 1, session: Session = Depends(get_
         {"request": request, "user": user, "activities": items,
          "page": page, "pages": pages, "total": total},
     )
+
+
+# ---------- perfil ----------
+
+@app.get("/perfil", response_class=HTMLResponse)
+def profile_page(request: Request, session: Session = Depends(get_session)):
+    user = get_current_user(request, session)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    activities = session.exec(
+        select(Activity).where(Activity.user_id == user.id)
+    ).all()
+    now = datetime.now()
+    return templates.TemplateResponse(
+        "perfil.html",
+        {
+            "request": request,
+            "user": user,
+            "username": username_from_email(user.email),
+            "totals": three_month_totals(activities, now),
+            "heatmap": activity_heatmap(activities, now),
+        },
+    )
+
+
+@app.post("/perfil/foto", response_class=HTMLResponse)
+async def upload_avatar(
+    request: Request,
+    avatar: UploadFile = File(...),
+    session: Session = Depends(get_session),
+):
+    """Upload da foto de perfil. Processa (resize/compress) e retorna o partial."""
+    user = get_current_user(request, session)
+    if not user:
+        return HTMLResponse(status_code=401)
+
+    raw = await avatar.read()
+    if len(raw) > MAX_PHOTO_BYTES:
+        return HTMLResponse("<p class=\"hint\">Arquivo grande demais (máx 20 MB).</p>", status_code=413)
+
+    try:
+        filename = save_avatar(raw, user.id)
+    except ValueError as e:
+        return HTMLResponse(f"<p class=\"hint\">{e}</p>", status_code=400)
+
+    if user.avatar_filename:
+        delete_photo_file(user.avatar_filename)  # remove a anterior
+    user.avatar_filename = filename
+    session.add(user)
+    session.commit()
+
+    ctx = {"request": request, "user": user, "username": username_from_email(user.email)}
+    return templates.TemplateResponse("_avatar.html", ctx)
+
+
+@app.delete("/perfil/foto", response_class=HTMLResponse)
+def remove_avatar(request: Request, session: Session = Depends(get_session)):
+    """Remove a foto de perfil (arquivo + referência no banco)."""
+    user = get_current_user(request, session)
+    if not user:
+        return HTMLResponse(status_code=401)
+
+    if user.avatar_filename:
+        delete_photo_file(user.avatar_filename)
+        user.avatar_filename = None
+        session.add(user)
+        session.commit()
+
+    ctx = {"request": request, "user": user, "username": username_from_email(user.email)}
+    return templates.TemplateResponse("_avatar.html", ctx)
 
 
 @app.post("/activities/upload")
