@@ -259,6 +259,24 @@ button:active { transform: scale(0.98); }
 .story-export[open] .story-caret { transform: rotate(180deg); }
 .story-export > .hint { margin: 0; padding: 0 16px 16px; }
 
+/* seletor da cor do traçado (vale pras duas variações) */
+.story-styles { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0 16px 16px; border: 0; }
+.story-styles legend { padding: 0 0 8px; font-family: var(--font-mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-muted); }
+.story-style {
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    padding: 8px 12px; border: 1px solid var(--border-2); border-radius: 999px;
+    font-size: 0.85rem; color: var(--text-soft);
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.story-style input { position: absolute; opacity: 0; pointer-events: none; }
+.story-style:hover { color: var(--text); }
+.story-style:has(input:checked) { border-color: var(--accent-glow); background: var(--accent-soft); color: var(--text); }
+.story-style:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--accent-soft); }
+.story-swatch { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+.story-swatch--gold { background: var(--gold); box-shadow: 0 0 6px rgba(168,145,92,0.6); }
+.story-swatch--ember { background: linear-gradient(135deg, #591010, #C2542E 55%, #F0AA6E); box-shadow: 0 0 6px rgba(194,84,46,0.6); }
+.story-swatch--parchment { background: var(--text); box-shadow: 0 0 0 2px #A02814, 0 0 8px rgba(160,40,20,0.8); }
+
 .story-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 0 16px 14px; }
 .story-option { margin: 0; display: flex; flex-direction: column; gap: 10px; }
 .story-preview {

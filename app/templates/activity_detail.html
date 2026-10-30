@@ -44,31 +44,42 @@
 
 {% if story_enabled %}
 {# Export pro story do Instagram. As prévias só são geradas ao abrir o painel
-   (o PNG é renderizado no servidor) e o mesmo blob serve prévia + compartilhar. #}
+   (o PNG é renderizado no servidor) e o mesmo blob serve prévia + compartilhar.
+   A cor do traçado escolhida vale pras duas variações (escuro e sticker). #}
 <details class="story-export" id="story-export"
-         data-dark="/activities/{{ activity.id }}/story.png?bg=dark"
-         data-transparent="/activities/{{ activity.id }}/story.png?bg=transparent"
+         data-url="/activities/{{ activity.id }}/story.png"
+         data-default-style="{{ story_default_style }}"
          data-name="treino-{{ activity.start_time.strftime('%Y-%m-%d') }}">
     <summary><i class="ph ph-instagram-logo"></i> Exportar para o story <i class="ph ph-caret-down story-caret"></i></summary>
+    <fieldset class="story-styles">
+        <legend>Cor do traçado</legend>
+        {% for key, label in story_styles.items() %}
+        <label class="story-style">
+            <input type="radio" name="story-style" value="{{ key }}" {% if key == story_default_style %}checked{% endif %}>
+            <span class="story-swatch story-swatch--{{ key }}" aria-hidden="true"></span>
+            <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+    </fieldset>
     <div class="story-options">
         <figure class="story-option">
             <div class="story-preview story-preview--dark"><img alt="Prévia do story com fundo escuro"></div>
             <figcaption>Fundo escuro · 9:16</figcaption>
             <div class="story-actions">
-                <button type="button" data-story-share="dark"><i class="ph ph-share-network"></i> Compartilhar</button>
-                <a class="story-download" href="/activities/{{ activity.id }}/story.png?bg=dark&download=1" title="Baixar PNG"><i class="ph ph-download-simple"></i></a>
+                <button type="button" data-story="dark"><i class="ph ph-share-network"></i> <span>Compartilhar</span></button>
+                <a class="story-download" data-download="dark" title="Baixar PNG"><i class="ph ph-download-simple"></i></a>
             </div>
         </figure>
         <figure class="story-option">
             <div class="story-preview story-preview--transparent"><img alt="Prévia do sticker transparente"></div>
             <figcaption>Sticker transparente</figcaption>
             <div class="story-actions">
-                <button type="button" data-story-copy="transparent"><i class="ph ph-copy"></i> Copiar</button>
-                <a class="story-download" href="/activities/{{ activity.id }}/story.png?bg=transparent&download=1" title="Baixar PNG"><i class="ph ph-download-simple"></i></a>
+                <button type="button" data-story="transparent"><i class="ph ph-share-network"></i> <span>Compartilhar</span></button>
+                <a class="story-download" data-download="transparent" title="Baixar PNG"><i class="ph ph-download-simple"></i></a>
             </div>
         </figure>
     </div>
-    <p class="hint" id="story-status"><i class="ph ph-info"></i> <span>Sticker: copie e, no story do Instagram, toque e segure na tela → Colar.</span></p>
+    <p class="hint" id="story-status"><i class="ph ph-info"></i> <span></span></p>
 </details>
 {% endif %}
 
@@ -187,27 +198,34 @@
         update();
     })();
 
-    // Export pro story: fundo escuro → menu de compartilhar do celular (Instagram
-    // aparece ali); sticker transparente → área de transferência, pra colar como
-    // sticker por cima de uma foto. Sem suporte no navegador, cai pra download.
+    // Export pro story. No celular, as duas variações abrem o menu de compartilhar
+    // do sistema: "Salvar Imagem" vai pra Fotos (o download do Safari iria pro app
+    // Arquivos) e "Copiar" é a cópia nativa, que o Instagram cola como figurinha.
+    // No computador: fundo escuro baixa o PNG; sticker vai pra área de transferência.
     (function () {
         const box = document.getElementById('story-export');
         if (!box) return;
         const statusEl = document.querySelector('#story-status span');
-        const blobs = {};  // bg -> Promise<Blob>, uma requisição por variação
+        const radios = box.querySelectorAll('input[name="story-style"]');
+        const STYLE_KEY = 'stamina.storyStyle';  // última cor escolhida (conveniência por navegador)
+        const blobs = {};  // "bg:style" -> Promise<Blob>, uma requisição por combinação
+        const previews = {};  // "bg:style" -> object URL da prévia
 
+        function style() { return box.querySelector('input[name="story-style"]:checked').value; }
+        function url(bg, st) { return `${box.dataset.url}?bg=${bg}&style=${st}`; }
         function load(bg) {
-            if (!blobs[bg]) {
-                blobs[bg] = fetch(box.dataset[bg]).then(r => {
+            const st = style(), key = `${bg}:${st}`;
+            if (!blobs[key]) {
+                blobs[key] = fetch(url(bg, st)).then(r => {
                     if (!r.ok) throw new Error(r.status);
                     return r.blob();
                 });
-                blobs[bg].catch(() => { delete blobs[bg]; });  // permite tentar de novo
+                blobs[key].catch(() => { delete blobs[key]; });  // permite tentar de novo
             }
-            return blobs[bg];
+            return blobs[key];
         }
         function say(msg) { statusEl.textContent = msg; }
-        function fileName(bg) { return `${box.dataset.name}-${bg === 'dark' ? 'story' : 'sticker'}.png`; }
+        function fileName(bg) { return `${box.dataset.name}-${bg === 'dark' ? 'story' : 'sticker'}-${style()}.png`; }
         function save(blob, name) {
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
@@ -216,45 +234,86 @@
             setTimeout(() => URL.revokeObjectURL(a.href), 1000);
         }
 
-        // Pré-carrega ao abrir: o share/copy precisa acontecer logo após o toque
-        // (o navegador exige gesto do usuário), sem esperar a imagem ser gerada.
-        box.addEventListener('toggle', () => {
-            if (!box.open) return;
+        // Prévias + links de download da cor atual. Também pré-carrega: o share/copy
+        // precisa acontecer logo após o toque (o navegador exige gesto do usuário),
+        // sem esperar a imagem ser gerada.
+        function refresh() {
+            const st = style();
             for (const bg of ['dark', 'transparent']) {
+                box.querySelector(`[data-download="${bg}"]`).href = url(bg, st) + '&download=1';
                 const img = box.querySelector(`.story-preview--${bg} img`);
-                if (img.src) continue;
+                const key = `${bg}:${st}`;
+                if (previews[key]) { img.src = previews[key]; continue; }
+                img.removeAttribute('src');
                 load(bg)
-                    .then(b => { img.src = URL.createObjectURL(b); })
+                    .then(b => {
+                        previews[key] = previews[key] || URL.createObjectURL(b);
+                        if (style() === st) img.src = previews[key];  // ignora se a cor já mudou
+                    })
                     .catch(() => say('Não foi possível gerar a imagem. Tente de novo.'));
             }
-        });
+        }
 
-        box.querySelector('[data-story-share]').addEventListener('click', async () => {
+        try {
+            const saved = localStorage.getItem(STYLE_KEY);
+            const radio = saved && box.querySelector(`input[name="story-style"][value="${saved}"]`);
+            if (radio) radio.checked = true;
+        } catch (_) {}
+        radios.forEach(r => r.addEventListener('change', () => {
+            try { localStorage.setItem(STYLE_KEY, style()); } catch (_) {}
+            refresh();
+        }));
+        box.addEventListener('toggle', () => { if (box.open) refresh(); });
+
+        const canShareFiles = !!(navigator.canShare &&
+            navigator.canShare({ files: [new File([''], 'x.png', { type: 'image/png' })] }));
+        const canCopy = !!(navigator.clipboard && window.ClipboardItem);
+        const PASTE_TIP = 'No story do Instagram, toque em Aa, toque e segure e escolha Colar — vira figurinha.';
+
+        if (canShareFiles) {
+            say('Sticker: no menu, toque em Copiar. ' + PASTE_TIP);
+        } else {
+            const dark = box.querySelector('[data-story="dark"]');
+            dark.querySelector('span').textContent = 'Baixar';
+            dark.querySelector('i').className = 'ph ph-download-simple';
+            if (canCopy) {
+                const tr = box.querySelector('[data-story="transparent"]');
+                tr.querySelector('span').textContent = 'Copiar';
+                tr.querySelector('i').className = 'ph ph-copy';
+            }
+        }
+
+        async function share(bg) {
             let blob;
-            try { blob = await load('dark'); } catch (_) { return say('Não foi possível gerar a imagem.'); }
-            const file = new File([blob], fileName('dark'), { type: 'image/png' });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({ files: [file] });
-                    return;
-                } catch (e) {
-                    if (e.name === 'AbortError') return;  // usuário fechou o menu
+            try { blob = await load(bg); } catch (_) { return say('Não foi possível gerar a imagem.'); }
+            const file = new File([blob], fileName(bg), { type: 'image/png' });
+            try {
+                await navigator.share({ files: [file] });
+            } catch (e) {
+                if (e.name !== 'AbortError') {  // AbortError = usuário fechou o menu
+                    save(blob, file.name);
+                    say('Não deu pra abrir o menu de compartilhar — baixamos o PNG.');
                 }
             }
-            save(blob, file.name);
-            say('Imagem baixada — poste pelo Instagram a partir da galeria.');
-        });
+        }
 
-        box.querySelector('[data-story-copy]').addEventListener('click', async () => {
+        async function copy() {
             try {
                 // ClipboardItem com Promise: o Safari exige isso pra manter o gesto do usuário.
                 await navigator.clipboard.write([new ClipboardItem({ 'image/png': load('transparent') })]);
-                say('Sticker copiado — no story do Instagram, toque e segure na tela → Colar.');
+                say('Sticker copiado. ' + PASTE_TIP);
             } catch (_) {
                 try { save(await load('transparent'), fileName('transparent')); } catch (_) { return say('Não foi possível gerar a imagem.'); }
                 say('Seu navegador não permite copiar imagens — baixamos o PNG.');
             }
-        });
+        }
+
+        box.querySelectorAll('[data-story]').forEach(btn => btn.addEventListener('click', async () => {
+            const bg = btn.dataset.story;
+            if (canShareFiles) return share(bg);
+            if (bg === 'transparent' && canCopy) return copy();
+            try { save(await load(bg), fileName(bg)); } catch (_) { say('Não foi possível gerar a imagem.'); }
+        }));
     })();
 </script>
 {% if activity.sport == 'training' %}

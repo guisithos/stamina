@@ -37,7 +37,14 @@ from .photos import (
     save_photo,
 )
 from .profile import activity_heatmap, three_month_totals, username_from_email
-from .story import BACKGROUNDS as STORY_BACKGROUNDS, STORY_SPORTS, render_story, story_filename
+from .story import (
+    BACKGROUNDS as STORY_BACKGROUNDS,
+    DEFAULT_STYLE as STORY_DEFAULT_STYLE,
+    STORY_SPORTS,
+    STYLES as STORY_STYLES,
+    render_story,
+    story_filename,
+)
 from .strength import EXERCISE_GROUPS, EXERCISES, exercise_label, muscles_for
 from .summary import (
     month_name,
@@ -600,6 +607,8 @@ def activity_detail(
     context = {
         "request": request, "user": user, "activity": activity,
         "story_enabled": activity.sport in STORY_SPORTS,  # export pro story do Instagram
+        "story_styles": STORY_STYLES,
+        "story_default_style": STORY_DEFAULT_STYLE,
     }
     if activity.sport == "training":  # musculação ganha o registro de séries + mapa muscular
         context.update(_strength_context(activity, session))
@@ -904,22 +913,23 @@ def activity_track(
 
 @app.get("/activities/{activity_id}/story.png")
 def activity_story(
-    request: Request, activity_id: int, bg: str = "dark", download: int = 0,
-    session: Session = Depends(get_session),
+    request: Request, activity_id: int, bg: str = "dark", style: str = STORY_DEFAULT_STYLE,
+    download: int = 0, session: Session = Depends(get_session),
 ):
     """PNG do treino pro story do Instagram: `bg=dark` (9:16 com fundo) ou
-    `bg=transparent` (sticker recortado). Gerado sob demanda — sem cache em disco,
-    pra refletir edições (ex.: distância da bike indoor) na hora."""
+    `bg=transparent` (sticker recortado); `style` = cor do traçado (gold, ember,
+    parchment). Gerado sob demanda — sem cache em disco, pra refletir edições
+    (ex.: distância da bike indoor) na hora."""
     user = get_current_user(request, session)
     if not user:
         return JSONResponse(status_code=401, content={"detail": "não autenticado"})
     activity = session.get(Activity, activity_id)
     if not activity or activity.user_id != user.id:
         return JSONResponse(status_code=404, content={"detail": "atividade não encontrada"})
-    if activity.sport not in STORY_SPORTS or bg not in STORY_BACKGROUNDS:
+    if activity.sport not in STORY_SPORTS or bg not in STORY_BACKGROUNDS or style not in STORY_STYLES:
         return JSONResponse(status_code=404, content={"detail": "story indisponível"})
 
     headers = {"Cache-Control": "private, no-cache"}
     if download:
-        headers["Content-Disposition"] = f'attachment; filename="{story_filename(activity, bg)}"'
-    return Response(render_story(activity, bg), media_type="image/png", headers=headers)
+        headers["Content-Disposition"] = f'attachment; filename="{story_filename(activity, bg, style)}"'
+    return Response(render_story(activity, bg, style), media_type="image/png", headers=headers)
