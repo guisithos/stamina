@@ -172,6 +172,7 @@ body { font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
   border-radius: var(--radius);
   background: var(--bg);
   color: var(--fg-btn);
+  text-decoration: none; /* .btn também é usado em <a> */
   cursor: pointer;
   transition: transform .15s var(--ease), background .2s var(--ease), box-shadow .2s var(--ease);
 }
@@ -477,6 +478,7 @@ body { font-family: var(--font-body); -webkit-font-smoothing: antialiased; }
   letter-spacing: .1em;
 }
 .badge-gps { background: var(--accent-10); color: var(--accent-glow); }
+.badge-manual { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
 
 .act-metrics {
   display: grid;

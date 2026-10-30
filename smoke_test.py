@@ -56,6 +56,23 @@ print('  mostra aviso sem gps:', "não tem dados de GPS" in r.text)
 g = client.get(f"/activities/{musc_id}/track.geojson").json()
 print("  geometry nula (indoor):", g["features"][0]["geometry"] is None)
 
+print("--- export pro story (PNG) ---")
+esteira_id = _by_label["Corrida (esteira)"]
+for _id, _nome in ((caminhada_id, "caminhada/traçado"), (esteira_id, "esteira/ícone")):
+    for _bg in ("dark", "transparent"):
+        r = client.get(f"/activities/{_id}/story.png?bg={_bg}")
+        print(f"  {_nome} {_bg}:", r.status_code, r.headers.get("content-type"), r.content[:4] == b"\x89PNG")
+print("  musculação sem story (404):", client.get(f"/activities/{musc_id}/story.png").status_code == 404)
+r = client.get(f"/activities/{esteira_id}/story.png?bg=dark&download=1")
+print("  download como anexo:", r.headers.get("content-disposition", "").startswith("attachment"))
+
+print("--- registro manual de atividade ---")
+r = client.get("/activities/new")
+print("  formulário:", r.status_code, "Registrar atividade" in r.text)
+r = client.post("/activities/new", data={"sport": "running", "start_time": "2026-03-15T07:00",
+                                         "duration_min": "30", "distance_km": "5,2"}, follow_redirects=False)
+print("  criada (303):", r.status_code, r.headers.get("location"))
+
 print("--- resumo mensal/semanal (ref fixa 31/05/2026) ---")
 from datetime import datetime as _dt
 from sqlmodel import Session, select

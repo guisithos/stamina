@@ -11,6 +11,9 @@
       {% if a.has_gps %}
         <span class="badge badge-gps" title="Tem GPS"><i class="ph ph-map-pin"></i> GPS</span>
       {% endif %}
+      {% if a.source == 'manual' %}
+        <span class="badge badge-manual" title="Registrada manualmente"><i class="ph ph-pencil-simple"></i> manual</span>
+      {% endif %}
     </div>
     <p class="act-date mono">{{ a.start_time | datebr }}</p>
   </div>

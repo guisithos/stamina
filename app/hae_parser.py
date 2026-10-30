@@ -33,7 +33,10 @@ _SPORT_KEYWORDS: list[tuple[tuple[str, ...], tuple[str, Optional[str]]]] = [
     (("caminh", "walk", "hik", "trilha"), ("walking", None)),
     (("nata", "swim"), ("swimming", None)),
 ]
-_INDOOR_TERMS = ("indoor", "intern", "esteira", "treadmill", "sala", "esteira")
+_INDOOR_TERMS = ("indoor", "intern", "esteira", "treadmill", "sala")
+# Natação: "Natação em Piscina"/"Pool Swim" vs "Natação em Águas Abertas"/"Open Water Swim".
+_POOL_TERMS = ("piscina", "pool")
+_OPEN_WATER_TERMS = ("aguas abertas", "open water")
 
 
 def _strip_accents(text: str) -> str:
@@ -50,6 +53,10 @@ def resolve_sport(name: Optional[str]) -> tuple[str, Optional[str]]:
                 sub = "indoor_cycling"
             elif sport == "running" and indoor:
                 sub = "treadmill"
+            elif sport == "swimming" and any(t in n for t in _POOL_TERMS):
+                sub = "lap_swimming"  # mesmos valores de sub_sport do FIT
+            elif sport == "swimming" and any(t in n for t in _OPEN_WATER_TERMS):
+                sub = "open_water"
             return (sport, sub)
     return (n.replace(" ", "_") or "unknown", None)
 

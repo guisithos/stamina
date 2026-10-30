@@ -102,19 +102,42 @@ h2 .ph { font-size: 1rem; color: var(--accent-glow); }
 .auth-box h1 { font-size: 1.7rem; margin-bottom: 22px; }
 .auth-box form { display: flex; flex-direction: column; gap: 16px; }
 .auth-box label { display: flex; flex-direction: column; gap: 6px; font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); }
-.auth-box input {
+.auth-box input, .auth-box select, .auth-box textarea {
     padding: 11px 13px;
     border: 1px solid var(--border-2);
     border-radius: var(--radius-sm);
     font-size: 0.95rem;
     font-family: var(--font-body);
     background: var(--surface);
+    color: var(--text);
     transition: border-color 0.15s, box-shadow 0.15s;
 }
-.auth-box input:focus { outline: none; border-color: var(--accent-glow); box-shadow: 0 0 0 3px var(--accent-soft); }
+.auth-box input:focus, .auth-box select:focus, .auth-box textarea:focus { outline: none; border-color: var(--accent-glow); box-shadow: 0 0 0 3px var(--accent-soft); }
+.auth-box textarea { resize: vertical; font-family: inherit; }
 .auth-switch { font-size: 0.88rem; margin-top: 20px; color: var(--text-muted); }
 .auth-switch a, .error a { color: var(--accent-glow); text-decoration: none; }
 .error { color: var(--danger); font-size: 0.88rem; }
+
+/* variante mais larga (formulário de registro manual de atividade) */
+.auth-box--wide { max-width: 480px; }
+.auth-box--wide .hint { margin: -6px 0 22px; }
+.auth-box .optional { text-transform: none; letter-spacing: normal; color: var(--text-muted); font-weight: 400; }
+.checkbox-row { flex-direction: row !important; align-items: center !important; gap: 8px !important; }
+.checkbox-row input[type="checkbox"] { width: auto; accent-color: var(--accent-glow); }
+
+/* badge (rótulos curtos: GPS, registro manual…) */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+.badge-manual { background: var(--surface-2); color: var(--text-muted); border: 1px solid var(--border-2); }
 
 /* botão (login/cadastro) */
 button {
@@ -214,6 +237,57 @@ button:active { transform: scale(0.98); }
 }
 .stat-label { font-family: var(--font-mono); font-size: 0.66rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.14em; }
 .stat-value { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.4rem, 4.5vw, 1.7rem); line-height: 1.05; letter-spacing: 0.01em; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+
+/* ---------- export pro story (Instagram) ---------- */
+.story-export {
+    margin-top: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+.story-export summary {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 16px; cursor: pointer; list-style: none;
+    font-family: var(--font-mono); font-size: 0.74rem; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.16em; color: var(--text-muted);
+}
+.story-export summary::-webkit-details-marker { display: none; }
+.story-export summary .ph { font-size: 1rem; color: var(--accent-glow); }
+.story-export summary:hover { color: var(--text); }
+.story-caret { margin-left: auto; transition: transform 0.2s var(--ease); }
+.story-export[open] .story-caret { transform: rotate(180deg); }
+.story-export > .hint { margin: 0; padding: 0 16px 16px; }
+
+.story-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 0 16px 14px; }
+.story-option { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.story-preview {
+    aspect-ratio: 9 / 16; max-height: 340px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-2); border-radius: var(--radius-sm); overflow: hidden;
+    background: var(--bg);
+}
+/* tabuleiro: deixa visível que o fundo do sticker é transparente */
+.story-preview--transparent {
+    background: repeating-conic-gradient(var(--surface-2) 0% 25%, var(--border) 0% 50%) 50% / 18px 18px;
+}
+.story-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.story-preview img:not([src]) { display: none; }
+.story-preview--transparent img { padding: 10%; }
+.story-option figcaption { font-family: var(--font-mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-muted); }
+.story-actions { display: flex; gap: 8px; }
+.story-actions button { flex: 1; padding: 10px 14px; font-size: 0.85rem; }
+.story-download {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 42px; flex-shrink: 0; border: 1px solid var(--border-2); border-radius: var(--radius);
+    color: var(--text-muted); text-decoration: none; font-size: 1.05rem;
+    transition: color 0.15s, border-color 0.15s;
+}
+.story-download:hover { color: var(--accent-glow); border-color: var(--accent-glow); }
+@media (max-width: 480px) {
+    .story-options { gap: 10px; }
+    .story-actions button { padding: 10px 8px; font-size: 0.78rem; }
+}
 
 #map { height: 380px; border: 1px solid var(--border); border-radius: var(--radius); margin-top: 16px; }
 #hr-chart { margin-top: 16px; }

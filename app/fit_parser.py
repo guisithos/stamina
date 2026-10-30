@@ -23,6 +23,8 @@ SPORT_LABELS = {
     ("running", "treadmill"): "Corrida (esteira)",
     ("running", None): "Corrida",
     ("cycling", None): "Bicicleta",
+    ("swimming", "lap_swimming"): "Natação (piscina)",
+    ("swimming", "open_water"): "Natação (águas abertas)",
     ("swimming", None): "Natação",
     ("training", "strength_training"): "Musculação",
     ("walking", "speed_walking"): "Caminhada",
