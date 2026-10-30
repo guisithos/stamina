@@ -38,6 +38,17 @@ caminhada_id = _by_label["Caminhada"]
 musc_id = _by_label["Musculação"]
 print("  ids por rótulo:", _by_label)
 
+print("--- listagens não carregam o percurso (memória) ---")
+from sqlalchemy import event
+_sql = []
+_capture = lambda conn, cur, stmt, params, ctx, many: _sql.append(stmt)
+event.listen(engine, "before_cursor_execute", _capture)
+for _path in ("/", "/perfil", "/historico"):
+    _sql.clear()
+    client.get(_path)
+    print(f"  {_path} sem track_points_json:", not any("track_points_json" in s for s in _sql))
+event.remove(engine, "before_cursor_execute", _capture)
+
 print("--- detalhe da caminhada (tem gps) ---")
 r = client.get(f"/activities/{caminhada_id}")
 print("status:", r.status_code)
@@ -55,6 +66,23 @@ print('  tem div do mapa:', 'id="map"' in r.text)
 print('  mostra aviso sem gps:', "não tem dados de GPS" in r.text)
 g = client.get(f"/activities/{musc_id}/track.geojson").json()
 print("  geometry nula (indoor):", g["features"][0]["geometry"] is None)
+
+print("--- export pro story (PNG) ---")
+esteira_id = _by_label["Corrida (esteira)"]
+for _id, _nome in ((caminhada_id, "caminhada/traçado"), (esteira_id, "esteira/ícone")):
+    for _bg in ("dark", "transparent"):
+        r = client.get(f"/activities/{_id}/story.png?bg={_bg}")
+        print(f"  {_nome} {_bg}:", r.status_code, r.headers.get("content-type"), r.content[:4] == b"\x89PNG")
+print("  musculação sem story (404):", client.get(f"/activities/{musc_id}/story.png").status_code == 404)
+r = client.get(f"/activities/{esteira_id}/story.png?bg=dark&download=1")
+print("  download como anexo:", r.headers.get("content-disposition", "").startswith("attachment"))
+
+print("--- registro manual de atividade ---")
+r = client.get("/activities/new")
+print("  formulário:", r.status_code, "Registrar atividade" in r.text)
+r = client.post("/activities/new", data={"sport": "running", "start_time": "2026-03-15T07:00",
+                                         "duration_min": "30", "distance_km": "5,2"}, follow_redirects=False)
+print("  criada (303):", r.status_code, r.headers.get("location"))
 
 print("--- resumo mensal/semanal (ref fixa 31/05/2026) ---")
 from datetime import datetime as _dt

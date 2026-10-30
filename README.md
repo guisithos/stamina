@@ -1,6 +1,6 @@
 # Stamina
 
-Backend em FastAPI + frontend server-side com Jinja2/HTMX. Importa arquivos `.fit`, guarda histórico de atividades por usuário, mostra mapa (Leaflet) pra atividades com GPS, gráfico de frequência cardíaca (Chart.js), e permite anexar foto a cada treino
+Backend em FastAPI + frontend server-side com Jinja2/HTMX. Importa arquivos `.fit`, guarda histórico de atividades por usuário, mostra mapa (Leaflet) pra atividades com GPS, gráfico de frequência cardíaca (Chart.js), permite anexar foto a cada treino, registrar treinos manualmente e exportar o treino como imagem pro story do Instagram.
 
 ## Rodando localmente (do zero)
 
@@ -40,8 +40,9 @@ Remove-Item app.db
 ### Smoke test automatizado
 
 `smoke_test.py` simula o fluxo inteiro (registro → upload → dashboard → detalhe →
-GeoJSON do percurso → exclusão → logout) usando o `TestClient` do FastAPI, sem
-precisar de servidor rodando. Ele lê os 3 `.fit` de teste da pasta `~/Documents`
+GeoJSON do percurso → story PNG → registro manual → exclusão → logout) usando o
+`TestClient` do FastAPI, sem precisar de servidor rodando. Ele lê os 3 `.fit` de
+teste (`Musculacao.fit`, `Esteira.fit`, `Caminhada.fit`) da pasta `~/Downloads`
 por padrão (ajustável pela variável de ambiente `FIT_DIR`):
 
 ```powershell
@@ -133,6 +134,49 @@ uma foto, ela é enviada automaticamente:
 - **Armazenamento:** as fotos ficam em `photos/` (local) ou `/data/photos/` (volume
   persistente no Fly), mesmo diretório do banco.
 
+## Registro manual
+
+Para treinos sem arquivo (relógio esquecido, bateria acabou, lançamento retroativo):
+no dashboard, **Adicionar manualmente** abre `/activities/new`. Esporte, data/hora e
+duração são obrigatórios; distância, FC média, calorias e nota são opcionais, e
+corrida tem a opção "esteira". A atividade entra com `source="manual"` (selo
+**manual** no histórico) e segue o mesmo modelo das demais.
+
+## Exportar para o story (Instagram)
+
+Na página de corrida, caminhada, bike ou natação, o painel **Exportar para o story**
+gera um PNG com o traçado do percurso em cobre e as métricas abaixo — só dados, sem
+marca nem data:
+
+| Esporte | Com GPS (traçado) | Sem GPS (ícone) |
+|---|---|---|
+| Corrida / caminhada | distância, pace /km, tempo, FC média | ícone de esteira + as mesmas |
+| Bike | distância, vel. média, tempo, elevação | ícone de bike indoor + distância, vel. média, tempo, FC média |
+| Natação | metros, pace /100m, tempo | ícone de piscina + as mesmas |
+
+Duas variações:
+
+- **Fundo escuro** (1080×1920, 9:16) — o botão **Compartilhar** abre o menu de
+  compartilhamento do celular (Instagram aparece ali). Sem suporte, baixa o PNG.
+- **Sticker transparente** (recortado no conteúdo, com sombra pra ler sobre fotos
+  claras) — **Copiar** põe a imagem na área de transferência; no story, toque e
+  segure na tela → Colar. Sem suporte, baixa o PNG.
+
+Detalhes:
+
+- Endpoint: `GET /activities/{id}/story.png?bg=dark|transparent` (`&download=1`
+  devolve como anexo). Gerado sob demanda no servidor com Pillow (~100–200 ms,
+  50–200 KB), sem cache em disco.
+- Traçado vs ícone é decidido por haver GPS, não pelo sub_sport. Métrica sem valor
+  é omitida (ex.: bike indoor sem distância mostra só o tempo). Elevação só aparece
+  quando o treino tem ganho registrado. O traçado de natação em águas abertas é
+  suavizado (GPS de pulso oscila na água).
+- Código em `app/story.py` (layout, ícones e formatação pt-BR ficam todos lá).
+  Fontes em `app/fonts/` — Fraunces SemiBold e IBM Plex Mono Medium, licença SIL
+  OFL (textos das licenças na mesma pasta).
+- O Health Auto Export agora distingue natação em piscina (`lap_swimming`) de
+  águas abertas (`open_water`) pelo nome do treino, como o FIT já faz.
+
 ## Decisões da v0 (e o que evolui depois)
 
 - **Formato de entrada: FIT.** É o que Garmin usa nativamente e o que o Zepp também
@@ -145,3 +189,10 @@ uma foto, ela é enviada automaticamente:
   atividade, não numa tabela separada. Simples o suficiente pro volume pessoal;
   se a quantidade de atividades crescer muito, vale normalizar pra uma tabela
   `activity_point` com índice por `activity_id`.
+- **Listagens não carregam o percurso.** Um treino de 1h tem ~0,5 MB de JSON; com
+  centenas de treinos, dashboard e perfil chegavam a +150 MB por requisição (a
+  máquina tem 256 MB). Toda query que devolve várias atividades usa
+  `.options(WITHOUT_TRACK)` (`app/models.py`), que tira `track_points_json` do
+  SELECT — se for acessado, é lido sob demanda. Medido com 300 corridas de 1h:
+  dashboard de +150 MB/248 ms para +3 MB/53 ms. Query nova que liste atividades
+  deve usar a mesma opção; o `smoke_test.py` verifica isso nas três listagens.

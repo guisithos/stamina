@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy.orm import defer
 from sqlmodel import Field, SQLModel
 
 
@@ -68,6 +69,14 @@ class Activity(SQLModel, table=True):
 
     raw_filename: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# Opção de carga pra queries que devolvem VÁRIAS atividades (dashboard, perfil,
+# histórico, comparativos): o percurso pesa ~0,5 MB por treino de 1h e nenhuma
+# listagem o usa — carregá-lo pra centenas de treinos estoura os 256 MB da máquina.
+# Com `.options(WITHOUT_TRACK)` a coluna fica fora do SELECT; se for acessada, é
+# lida sob demanda (lazy). `session.get` de UMA atividade segue carregando tudo.
+WITHOUT_TRACK = defer(Activity.track_points_json)
 
 
 class StrengthSet(SQLModel, table=True):

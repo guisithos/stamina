@@ -5,7 +5,7 @@ from datetime import date, datetime
 from typing import Optional
 
 from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
@@ -28,7 +28,7 @@ from .metrics import (
     format_speed,
     sport_icon,
 )
-from .models import Activity, StrengthSet, User
+from .models import WITHOUT_TRACK, Activity, StrengthSet, User
 from .photos import (
     PHOTOS_DIR,
     MAX_PHOTO_BYTES,
@@ -37,6 +37,7 @@ from .photos import (
     save_photo,
 )
 from .profile import activity_heatmap, three_month_totals, username_from_email
+from .story import BACKGROUNDS as STORY_BACKGROUNDS, STORY_SPORTS, render_story, story_filename
 from .strength import EXERCISE_GROUPS, EXERCISES, exercise_label, muscles_for
 from .summary import (
     month_name,
@@ -118,7 +119,9 @@ def normalize_hae_sports() -> None:
     """Conserta atividades do HAE que entraram com `sport` genérico (nome do treino
     veio localizado e não foi reconhecido). Re-deriva pelo rótulo. Idempotente."""
     with Session(engine) as session:
-        activities = session.exec(select(Activity).where(Activity.source == "hae")).all()
+        activities = session.exec(
+            select(Activity).where(Activity.source == "hae").options(WITHOUT_TRACK)
+        ).all()
         changed = 0
         for a in activities:
             if a.sport in KNOWN_SPORTS:
@@ -221,6 +224,7 @@ def dashboard(request: Request, m: str = "", session: Session = Depends(get_sess
         select(Activity)
         .where(Activity.user_id == user.id)
         .order_by(Activity.start_time.desc())
+        .options(WITHOUT_TRACK)
     )
     activities = session.exec(statement).all()
     now = datetime.now()
@@ -267,6 +271,7 @@ def history_all(request: Request, page: int = 1, session: Session = Depends(get_
         .order_by(Activity.start_time.desc())
         .offset((page - 1) * HISTORY_PAGE_SIZE)
         .limit(HISTORY_PAGE_SIZE)
+        .options(WITHOUT_TRACK)
     ).all()
     return templates.TemplateResponse(
         "historico.html",
@@ -284,7 +289,7 @@ def profile_page(request: Request, session: Session = Depends(get_session)):
         return RedirectResponse(url="/login", status_code=303)
 
     activities = session.exec(
-        select(Activity).where(Activity.user_id == user.id)
+        select(Activity).where(Activity.user_id == user.id).options(WITHOUT_TRACK)
     ).all()
     now = datetime.now()
     return templates.TemplateResponse(
@@ -395,6 +400,121 @@ def _activity_from_parsed(user_id, parsed, *, source, external_id=None, raw_file
     )
 
 
+# Esportes aceitos no registro manual, na mesma ordem usada em SPORT_METRICS
+# (metrics.py). Rótulo vem do catálogo único de fit_parser — se um esporte
+# novo for adicionado lá, basta incluir a chave aqui. "training" só tem
+# rótulo amigável com sub_sport="strength_training" (ver SPORT_LABELS).
+MANUAL_SUB_SPORT = {"training": "strength_training"}
+MANUAL_SPORTS = [
+    {"value": s, "label": friendly_sport(s, MANUAL_SUB_SPORT.get(s))}
+    for s in ["running", "cycling", "swimming", "walking", "training"]
+]
+
+
+@app.get("/activities/new", response_class=HTMLResponse)
+def new_activity_page(request: Request, session: Session = Depends(get_session)):
+    user = get_current_user(request, session)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    return templates.TemplateResponse(
+        "activity_new.html",
+        {
+            "request": request,
+            "user": user,
+            "sports": MANUAL_SPORTS,
+            "now": datetime.now().strftime("%Y-%m-%dT%H:%M"),
+            "error": None,
+            "form": {},
+        },
+    )
+
+
+@app.post("/activities/new")
+def create_manual_activity(
+    request: Request,
+    sport: str = Form(...),
+    treadmill: str = Form(""),
+    start_time: str = Form(...),
+    duration_min: str = Form(""),
+    distance_km: str = Form(""),
+    avg_hr: str = Form(""),
+    calories: str = Form(""),
+    note: str = Form(""),
+    session: Session = Depends(get_session),
+):
+    """Cria uma atividade sem arquivo de origem (esqueceu o relógio, treino não
+    rastreado, lançamento retroativo etc.) — mesmo modelo de dado das demais
+    origens, só que preenchido pelo usuário em vez de um parser."""
+    user = get_current_user(request, session)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+
+    def _error(msg: str):
+        return templates.TemplateResponse(
+            "activity_new.html",
+            {
+                "request": request,
+                "user": user,
+                "sports": MANUAL_SPORTS,
+                "now": start_time or datetime.now().strftime("%Y-%m-%dT%H:%M"),
+                "error": msg,
+                "form": {
+                    "sport": sport, "treadmill": treadmill, "distance_km": distance_km,
+                    "avg_hr": avg_hr, "calories": calories, "note": note,
+                },
+            },
+            status_code=400,
+        )
+
+    if sport not in {s["value"] for s in MANUAL_SPORTS}:
+        return _error("Esporte inválido.")
+    try:
+        dt = datetime.fromisoformat(start_time)
+    except (TypeError, ValueError):
+        return _error("Data e hora inválidas.")
+
+    def _to_int(v):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+
+    def _to_float(v):
+        try:
+            return float(str(v).replace(",", "."))
+        except (TypeError, ValueError):
+            return None
+
+    minutes = _to_float(duration_min)
+    if not minutes or minutes <= 0:
+        return _error("Informe a duração (em minutos).")
+
+    if sport == "running" and treadmill:
+        sub_sport = "treadmill"
+    else:
+        sub_sport = MANUAL_SUB_SPORT.get(sport)
+    distance = None if sport == "training" else _to_float(distance_km)
+
+    activity = Activity(
+        user_id=user.id,
+        source="manual",
+        sport=sport,
+        sub_sport=sub_sport,
+        label=friendly_sport(sport, sub_sport),
+        start_time=dt,
+        total_time_s=minutes * 60,
+        avg_hr=_to_int(avg_hr),
+        calories=_to_int(calories),
+        distance_m=(distance * 1000) if distance and distance > 0 else None,
+        has_gps=False,
+        note=note.strip() or None,
+    )
+    session.add(activity)
+    session.commit()
+    session.refresh(activity)
+    return RedirectResponse(url=f"/activities/{activity.id}", status_code=303)
+
+
 def _extract_ingest_token(request: Request) -> Optional[str]:
     """Token via Authorization: Bearer, header X-Ingest-Token ou ?token= (nessa ordem)."""
     auth = request.headers.get("authorization", "")
@@ -426,7 +546,7 @@ async def ingest_hae(request: Request, session: Session = Depends(get_session)):
         try:
             ext = str(w.get("id")) if w.get("id") is not None else None
             if ext and session.exec(
-                select(Activity).where(
+                select(Activity.id).where(
                     Activity.user_id == user.id,
                     Activity.source == "hae",
                     Activity.external_id == ext,
@@ -477,7 +597,10 @@ def activity_detail(
     # Os pontos do percurso NÃO vão embutidos no HTML — a página os busca via
     # GET /activities/{id}/track.geojson. Mantém o HTML leve e a geometria
     # cacheável/reutilizável.
-    context = {"request": request, "user": user, "activity": activity}
+    context = {
+        "request": request, "user": user, "activity": activity,
+        "story_enabled": activity.sport in STORY_SPORTS,  # export pro story do Instagram
+    }
     if activity.sport == "training":  # musculação ganha o registro de séries + mapa muscular
         context.update(_strength_context(activity, session))
     elif activity.sport == "running":
@@ -489,6 +612,7 @@ def activity_detail(
                    Activity.start_time < activity.start_time)
             .order_by(Activity.start_time.desc())
             .limit(5)
+            .options(WITHOUT_TRACK)
         ).all()
         context["analysis"] = build_run_analysis(activity, list(previous))
         context["ai_enabled"] = ai.is_enabled()  # mostra (ou não) o botão de IA
@@ -520,6 +644,7 @@ def analyze_activity(
                Activity.start_time < activity.start_time)
         .order_by(Activity.start_time.desc())
         .limit(8)  # últimas 8 corridas pro comparativo
+        .options(WITHOUT_TRACK)
     ).all()
     text = ai.generate_run_narrative(build_run_dataset(activity, list(previous)))
     if text:
@@ -775,3 +900,26 @@ def activity_track(
 
     points = json.loads(activity.track_points_json) if activity.track_points_json else []
     return JSONResponse(track_to_geojson(points))
+
+
+@app.get("/activities/{activity_id}/story.png")
+def activity_story(
+    request: Request, activity_id: int, bg: str = "dark", download: int = 0,
+    session: Session = Depends(get_session),
+):
+    """PNG do treino pro story do Instagram: `bg=dark` (9:16 com fundo) ou
+    `bg=transparent` (sticker recortado). Gerado sob demanda — sem cache em disco,
+    pra refletir edições (ex.: distância da bike indoor) na hora."""
+    user = get_current_user(request, session)
+    if not user:
+        return JSONResponse(status_code=401, content={"detail": "não autenticado"})
+    activity = session.get(Activity, activity_id)
+    if not activity or activity.user_id != user.id:
+        return JSONResponse(status_code=404, content={"detail": "atividade não encontrada"})
+    if activity.sport not in STORY_SPORTS or bg not in STORY_BACKGROUNDS:
+        return JSONResponse(status_code=404, content={"detail": "story indisponível"})
+
+    headers = {"Cache-Control": "private, no-cache"}
+    if download:
+        headers["Content-Disposition"] = f'attachment; filename="{story_filename(activity, bg)}"'
+    return Response(render_story(activity, bg), media_type="image/png", headers=headers)
