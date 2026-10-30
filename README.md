@@ -145,8 +145,18 @@ corrida tem a opção "esteira". A atividade entra com `source="manual"` (selo
 ## Exportar para o story (Instagram)
 
 Na página de corrida, caminhada, bike ou natação, o painel **Exportar para o story**
-gera um PNG com o traçado do percurso em cobre e as métricas abaixo — só dados, sem
-marca nem data:
+gera um PNG com o traçado do percurso e as métricas abaixo — só dados, sem marca nem
+data. No topo do painel escolhe-se a **cor do traçado** (vale pras duas variações e
+pros ícones indoor; o navegador lembra a última escolha):
+
+- **Ouro gasto** — linha dourada com brilho suave.
+- **Brasa** (padrão) — degradê ao longo do percurso, de brasa funda no início a
+  brasa acesa no fim (mostra o sentido); nos ícones, sobe como chama.
+- **Pergaminho em brasa** — linha creme com halo vermelho-brasa.
+
+(Nenhuma é uma linha laranja lisa — de propósito, pra não lembrar o Strava.)
+
+Métricas por esporte:
 
 | Esporte | Com GPS (traçado) | Sem GPS (ícone) |
 |---|---|---|
@@ -156,16 +166,21 @@ marca nem data:
 
 Duas variações:
 
-- **Fundo escuro** (1080×1920, 9:16) — o botão **Compartilhar** abre o menu de
-  compartilhamento do celular (Instagram aparece ali). Sem suporte, baixa o PNG.
+- **Fundo escuro** (1080×1920, 9:16) — pronto pra postar como story.
 - **Sticker transparente** (recortado no conteúdo, com sombra pra ler sobre fotos
-  claras) — **Copiar** põe a imagem na área de transferência; no story, toque e
-  segure na tela → Colar. Sem suporte, baixa o PNG.
+  claras) — pra colar como figurinha por cima de uma foto/vídeo.
+
+No celular, as duas abrem o **menu de compartilhar do sistema**: "Salvar Imagem"
+manda o PNG pra Fotos (com transparência) e "Copiar" põe a imagem na área de
+transferência — no story do Instagram, toque em **Aa**, toque e segure e escolha
+**Colar** pra virar figurinha. (O link de download direto, no iPhone, salva no app
+Arquivos, não em Fotos — por isso o menu de compartilhar é o caminho principal.)
+No computador, o fundo escuro baixa o PNG e o sticker vai pra área de transferência.
 
 Detalhes:
 
-- Endpoint: `GET /activities/{id}/story.png?bg=dark|transparent` (`&download=1`
-  devolve como anexo). Gerado sob demanda no servidor com Pillow (~100–200 ms,
+- Endpoint: `GET /activities/{id}/story.png?bg=dark|transparent&style=gold|ember|parchment`
+  (`&download=1` devolve como anexo). Gerado sob demanda no servidor com Pillow (~100–200 ms,
   50–200 KB), sem cache em disco.
 - Traçado vs ícone é decidido por haver GPS, não pelo sub_sport. Métrica sem valor
   é omitida (ex.: bike indoor sem distância mostra só o tempo). Elevação só aparece

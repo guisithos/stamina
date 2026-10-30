@@ -73,6 +73,10 @@ for _id, _nome in ((caminhada_id, "caminhada/traçado"), (esteira_id, "esteira/�
     for _bg in ("dark", "transparent"):
         r = client.get(f"/activities/{_id}/story.png?bg={_bg}")
         print(f"  {_nome} {_bg}:", r.status_code, r.headers.get("content-type"), r.content[:4] == b"\x89PNG")
+for _st in ("gold", "ember", "parchment"):
+    r = client.get(f"/activities/{caminhada_id}/story.png?bg=dark&style={_st}")
+    print(f"  estilo {_st}:", r.status_code, r.content[:4] == b"\x89PNG")
+print("  estilo inválido (404):", client.get(f"/activities/{caminhada_id}/story.png?style=neon").status_code == 404)
 print("  musculação sem story (404):", client.get(f"/activities/{musc_id}/story.png").status_code == 404)
 r = client.get(f"/activities/{esteira_id}/story.png?bg=dark&download=1")
 print("  download como anexo:", r.headers.get("content-disposition", "").startswith("attachment"))
