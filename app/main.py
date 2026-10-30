@@ -28,7 +28,7 @@ from .metrics import (
     format_speed,
     sport_icon,
 )
-from .models import Activity, StrengthSet, User
+from .models import WITHOUT_TRACK, Activity, StrengthSet, User
 from .photos import (
     PHOTOS_DIR,
     MAX_PHOTO_BYTES,
@@ -119,7 +119,9 @@ def normalize_hae_sports() -> None:
     """Conserta atividades do HAE que entraram com `sport` genérico (nome do treino
     veio localizado e não foi reconhecido). Re-deriva pelo rótulo. Idempotente."""
     with Session(engine) as session:
-        activities = session.exec(select(Activity).where(Activity.source == "hae")).all()
+        activities = session.exec(
+            select(Activity).where(Activity.source == "hae").options(WITHOUT_TRACK)
+        ).all()
         changed = 0
         for a in activities:
             if a.sport in KNOWN_SPORTS:
@@ -222,6 +224,7 @@ def dashboard(request: Request, m: str = "", session: Session = Depends(get_sess
         select(Activity)
         .where(Activity.user_id == user.id)
         .order_by(Activity.start_time.desc())
+        .options(WITHOUT_TRACK)
     )
     activities = session.exec(statement).all()
     now = datetime.now()
@@ -268,6 +271,7 @@ def history_all(request: Request, page: int = 1, session: Session = Depends(get_
         .order_by(Activity.start_time.desc())
         .offset((page - 1) * HISTORY_PAGE_SIZE)
         .limit(HISTORY_PAGE_SIZE)
+        .options(WITHOUT_TRACK)
     ).all()
     return templates.TemplateResponse(
         "historico.html",
@@ -285,7 +289,7 @@ def profile_page(request: Request, session: Session = Depends(get_session)):
         return RedirectResponse(url="/login", status_code=303)
 
     activities = session.exec(
-        select(Activity).where(Activity.user_id == user.id)
+        select(Activity).where(Activity.user_id == user.id).options(WITHOUT_TRACK)
     ).all()
     now = datetime.now()
     return templates.TemplateResponse(
@@ -542,7 +546,7 @@ async def ingest_hae(request: Request, session: Session = Depends(get_session)):
         try:
             ext = str(w.get("id")) if w.get("id") is not None else None
             if ext and session.exec(
-                select(Activity).where(
+                select(Activity.id).where(
                     Activity.user_id == user.id,
                     Activity.source == "hae",
                     Activity.external_id == ext,
@@ -608,6 +612,7 @@ def activity_detail(
                    Activity.start_time < activity.start_time)
             .order_by(Activity.start_time.desc())
             .limit(5)
+            .options(WITHOUT_TRACK)
         ).all()
         context["analysis"] = build_run_analysis(activity, list(previous))
         context["ai_enabled"] = ai.is_enabled()  # mostra (ou não) o botão de IA
@@ -639,6 +644,7 @@ def analyze_activity(
                Activity.start_time < activity.start_time)
         .order_by(Activity.start_time.desc())
         .limit(8)  # últimas 8 corridas pro comparativo
+        .options(WITHOUT_TRACK)
     ).all()
     text = ai.generate_run_narrative(build_run_dataset(activity, list(previous)))
     if text:

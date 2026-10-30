@@ -189,3 +189,10 @@ Detalhes:
   atividade, não numa tabela separada. Simples o suficiente pro volume pessoal;
   se a quantidade de atividades crescer muito, vale normalizar pra uma tabela
   `activity_point` com índice por `activity_id`.
+- **Listagens não carregam o percurso.** Um treino de 1h tem ~0,5 MB de JSON; com
+  centenas de treinos, dashboard e perfil chegavam a +150 MB por requisição (a
+  máquina tem 256 MB). Toda query que devolve várias atividades usa
+  `.options(WITHOUT_TRACK)` (`app/models.py`), que tira `track_points_json` do
+  SELECT — se for acessado, é lido sob demanda. Medido com 300 corridas de 1h:
+  dashboard de +150 MB/248 ms para +3 MB/53 ms. Query nova que liste atividades
+  deve usar a mesma opção; o `smoke_test.py` verifica isso nas três listagens.

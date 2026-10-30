@@ -38,6 +38,17 @@ caminhada_id = _by_label["Caminhada"]
 musc_id = _by_label["Musculação"]
 print("  ids por rótulo:", _by_label)
 
+print("--- listagens não carregam o percurso (memória) ---")
+from sqlalchemy import event
+_sql = []
+_capture = lambda conn, cur, stmt, params, ctx, many: _sql.append(stmt)
+event.listen(engine, "before_cursor_execute", _capture)
+for _path in ("/", "/perfil", "/historico"):
+    _sql.clear()
+    client.get(_path)
+    print(f"  {_path} sem track_points_json:", not any("track_points_json" in s for s in _sql))
+event.remove(engine, "before_cursor_execute", _capture)
+
 print("--- detalhe da caminhada (tem gps) ---")
 r = client.get(f"/activities/{caminhada_id}")
 print("status:", r.status_code)
